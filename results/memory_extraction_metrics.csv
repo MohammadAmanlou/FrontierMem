@@ -1,0 +1,5 @@
+metric,score
+family_correct,0.9253826530612245
+stable_vs_scoped_correct,0.951530612244898
+owner_correct,0.9961734693877551
+temporal_correct,0.9311224489795918

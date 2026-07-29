@@ -1,0 +1,19 @@
+FRONTIERMEM INITIAL PROTOTYPE - QUICK START
+
+1) Open notebooks/FrontierMem_Initial_Prototype.html for the fastest presentation.
+2) Open notebooks/FrontierMem_Initial_Prototype.ipynb to inspect and rerun the code.
+3) Reproduce all results:
+       python run_demo.py
+4) Inspect one structured decision:
+       python interactive_demo.py --family travel_budget --zone near --variant scoped
+5) Run tests:
+       pytest -q
+
+Main lexical-holdout result:
+- FrontierMem-Lite accuracy: 0.947
+- Raw long-context TF-IDF accuracy: 0.816
+- FrontierMem-Lite macro-F1: 0.920
+- FrontierMem-Lite overgeneralization rate: 0.091
+- Flat fact-memory overgeneralization rate: 1.000
+
+Important: This is a controlled offline proof-of-concept with synthetic counterfactual data and a transparent rule-based memory extractor. It validates the research formulation and pipeline; it is not the final trained LLM system.

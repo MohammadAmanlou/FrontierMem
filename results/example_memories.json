@@ -1,0 +1,284 @@
+[
+  {
+    "family": "travel_budget",
+    "zone": "outside",
+    "history": "Session 1: Earlier, we discussed a calendar reminder and a grocery list.\nSession 2: I usually enjoy comfortable premium hotels.\nSession 3: For this trip, please find a cheap but clean hotel.\nSession 4: This trip is different because the university reimbursement cap is strict.\nSession 5: A separate session involved planning a routine appointment.\nSession 6: The low price request is only for this capped trip, not a general travel preference.",
+    "query": "The university confirmed unlimited hotel reimbursement for this trip.",
+    "gold_action": "IGNORE",
+    "predicted_action": "IGNORE",
+    "structured_memory": {
+      "preference": "budget-conscious accommodation",
+      "owner": "user",
+      "information_type": "temporary_constraint",
+      "applies_when": "the traveler is paying personally or a strict reimbursement cap applies",
+      "does_not_apply_when": "the trip is fully reimbursed without a cap",
+      "temporal_validity": "temporary",
+      "confidence": 0.945,
+      "evidence": [
+        "I usually enjoy comfortable premium hotels.",
+        "For this trip, please find a cheap but clean hotel.",
+        "This trip is different because the university reimbursement cap is strict."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "The previous preference is outside its valid scope here, so I will compare comfort, location, and quality without forcing the cheapest option."
+  },
+  {
+    "family": "travel_budget",
+    "zone": "inside",
+    "history": "Session 1: Another conversation concerned a book recommendation unrelated to this preference.\nSession 2: I usually enjoy comfortable premium hotels.\nSession 3: For this trip, please find a cheap but clean hotel.\nSession 4: This trip is different because the university reimbursement cap is strict.\nSession 5: Earlier, we discussed a calendar reminder and a grocery list.\nSession 6: The low price request is only for this capped trip, not a general travel preference.",
+    "query": "I need accommodation that stays within my limited personal budget.",
+    "gold_action": "APPLY",
+    "predicted_action": "APPLY",
+    "structured_memory": {
+      "preference": "budget-conscious accommodation",
+      "owner": "user",
+      "information_type": "temporary_constraint",
+      "applies_when": "the traveler is paying personally or a strict reimbursement cap applies",
+      "does_not_apply_when": "the trip is fully reimbursed without a cap",
+      "temporal_validity": "temporary",
+      "confidence": 0.965,
+      "evidence": [
+        "I usually enjoy comfortable premium hotels.",
+        "For this trip, please find a cheap but clean hotel.",
+        "This trip is different because the university reimbursement cap is strict."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "I will use the stored preference and prioritize clean, well-reviewed budget hotels."
+  },
+  {
+    "family": "travel_budget",
+    "zone": "near",
+    "history": "Session 1: I usually enjoy comfortable premium hotels.\nSession 2: There was also a short exchange about organizing files on a laptop.\nSession 3: For this trip, please find a cheap but clean hotel.\nSession 4: This trip is different because the university reimbursement cap is strict.\nSession 5: The assistant previously helped summarize a news article.\nSession 6: The low price request is only for this capped trip, not a general travel preference.",
+    "query": "I need a hotel for a conference and have not checked who will pay.",
+    "gold_action": "CLARIFY",
+    "predicted_action": "CLARIFY",
+    "structured_memory": {
+      "preference": "accommodation close to the destination",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the trip is a short business visit with a tightly packed schedule",
+      "does_not_apply_when": "the trip is a relaxed multi-day leisure vacation",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.945,
+      "evidence": [
+        "There was also a short exchange about organizing files on a laptop.",
+        "For this trip, please find a cheap but clean hotel.",
+        "This trip is different because the university reimbursement cap is strict."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "Will you pay personally, or is this trip reimbursed without a cap?"
+  },
+  {
+    "family": "education_detail",
+    "zone": "inside",
+    "history": "Session 1: The user also asked for help rephrasing a short technical note.\nSession 2: When I am learning a new concept, I want detailed explanations.\nSession 3: Explain it step by step and include the reasoning.\nSession 4: During timed quizzes, I only want the final answer so I can move quickly.\nSession 5: A separate session involved planning a routine appointment.\nSession 6: The desired level of detail depends on whether I am learning or being tested.",
+    "query": "Help me understand a new concept rather than just giving the result.",
+    "gold_action": "APPLY",
+    "predicted_action": "APPLY",
+    "structured_memory": {
+      "preference": "detailed step-by-step explanations",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the user is learning a new or unfamiliar concept",
+      "does_not_apply_when": "the user is in a timed quiz or explicitly requests only the final answer",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "When I am learning a new concept, I want detailed explanations."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "I will use the stored preference and give a structured, step-by-step explanation with explicit reasoning."
+  },
+  {
+    "family": "education_detail",
+    "zone": "near",
+    "history": "Session 1: When I am learning a new concept, I want detailed explanations.\nSession 2: Earlier, we discussed a calendar reminder and a grocery list.\nSession 3: Explain it step by step and include the reasoning.\nSession 4: During timed quizzes, I only want the final answer so I can move quickly.\nSession 5: Another conversation concerned a book recommendation unrelated to this preference.\nSession 6: The desired level of detail depends on whether I am learning or being tested.",
+    "query": "Explain this material, but I have not said how much detail I need.",
+    "gold_action": "CLARIFY",
+    "predicted_action": "CLARIFY",
+    "structured_memory": {
+      "preference": "detailed step-by-step explanations",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the user is learning a new or unfamiliar concept",
+      "does_not_apply_when": "the user is in a timed quiz or explicitly requests only the final answer",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "When I am learning a new concept, I want detailed explanations."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "Do you want a quick final answer or a full step-by-step explanation?"
+  },
+  {
+    "family": "education_detail",
+    "zone": "outside",
+    "history": "Session 1: The user also asked for help rephrasing a short technical note.\nSession 2: When I am learning a new concept, I want detailed explanations.\nSession 3: Explain it step by step and include the reasoning.\nSession 4: During timed quizzes, I only want the final answer so I can move quickly.\nSession 5: There was also a short exchange about organizing files on a laptop.\nSession 6: The desired level of detail depends on whether I am learning or being tested.",
+    "query": "I have thirty seconds left; just state the result.",
+    "gold_action": "IGNORE",
+    "predicted_action": "IGNORE",
+    "structured_memory": {
+      "preference": "detailed step-by-step explanations",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the user is learning a new or unfamiliar concept",
+      "does_not_apply_when": "the user is in a timed quiz or explicitly requests only the final answer",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "When I am learning a new concept, I want detailed explanations."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "The previous preference is outside its valid scope here, so I will provide the direct result without adding unnecessary derivation."
+  },
+  {
+    "family": "food_vegetarian_ownership",
+    "zone": "near",
+    "history": "Session 1: I eat meat and do not follow a vegetarian diet.\nSession 2: The user also asked for help rephrasing a short technical note.\nSession 3: Please make sure there are vegetarian options.\nSession 4: My sister is vegetarian, so I request vegetarian options only when she joins.\nSession 5: There was also a short exchange about organizing files on a laptop.\nSession 6: The preference belongs to another person rather than to me.",
+    "query": "Choose food for a gathering without knowing whether my sister will join.",
+    "gold_action": "CLARIFY",
+    "predicted_action": "APPLY",
+    "structured_memory": {
+      "preference": "vegetarian food",
+      "owner": "other",
+      "information_type": "other_owner",
+      "applies_when": "the meal includes the vegetarian sister",
+      "does_not_apply_when": "the meal is only for the user",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.93,
+      "evidence": [
+        "I eat meat and do not follow a vegetarian diet.",
+        "Please make sure there are vegetarian options.",
+        "My sister is vegetarian, so I request vegetarian options only when she joins."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "I will use the stored preference and ensure the recommendation includes strong vegetarian choices."
+  },
+  {
+    "family": "food_vegetarian_ownership",
+    "zone": "inside",
+    "history": "Session 1: There was also a short exchange about organizing files on a laptop.\nSession 2: I eat meat and do not follow a vegetarian diet.\nSession 3: Please make sure there are vegetarian options.\nSession 4: My sister is vegetarian, so I request vegetarian options only when she joins.\nSession 5: The assistant previously helped summarize a news article.\nSession 6: The preference belongs to another person rather than to me.",
+    "query": "Choose food for a family dinner that includes my vegetarian sibling.",
+    "gold_action": "APPLY",
+    "predicted_action": "APPLY",
+    "structured_memory": {
+      "preference": "vegetarian food",
+      "owner": "other",
+      "information_type": "other_owner",
+      "applies_when": "the meal includes the vegetarian sister",
+      "does_not_apply_when": "the meal is only for the user",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.93,
+      "evidence": [
+        "I eat meat and do not follow a vegetarian diet.",
+        "Please make sure there are vegetarian options.",
+        "My sister is vegetarian, so I request vegetarian options only when she joins."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "I will use the stored preference and ensure the recommendation includes strong vegetarian choices."
+  },
+  {
+    "family": "food_vegetarian_ownership",
+    "zone": "outside",
+    "history": "Session 1: Another conversation concerned a book recommendation unrelated to this preference.\nSession 2: I eat meat and do not follow a vegetarian diet.\nSession 3: Please make sure there are vegetarian options.\nSession 4: My sister is vegetarian, so I request vegetarian options only when she joins.\nSession 5: The user also asked for help rephrasing a short technical note.\nSession 6: The preference belongs to another person rather than to me.",
+    "query": "Recommend a meal for the user only, with no vegetarian guest.",
+    "gold_action": "IGNORE",
+    "predicted_action": "IGNORE",
+    "structured_memory": {
+      "preference": "vegetarian food",
+      "owner": "other",
+      "information_type": "other_owner",
+      "applies_when": "the meal includes the vegetarian sister",
+      "does_not_apply_when": "the meal is only for the user",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.93,
+      "evidence": [
+        "I eat meat and do not follow a vegetarian diet.",
+        "Please make sure there are vegetarian options.",
+        "My sister is vegetarian, so I request vegetarian options only when she joins."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "The previous preference is outside its valid scope here, so I will do not assume the user personally requires vegetarian food."
+  },
+  {
+    "family": "writing_formality",
+    "zone": "outside",
+    "history": "Session 1: I am casual and playful with friends.\nSession 2: A separate session involved planning a routine appointment.\nSession 3: Please make this message formal.\nSession 4: I use formal wording only for professors, job applications, and official requests.\nSession 5: The user also asked for help rephrasing a short technical note.\nSession 6: The formal style in this message is role-specific rather than my global preference.",
+    "query": "Draft a playful note to a friend I have known for years.",
+    "gold_action": "IGNORE",
+    "predicted_action": "IGNORE",
+    "structured_memory": {
+      "preference": "formal tone",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the audience is a professor, employer, or official institution",
+      "does_not_apply_when": "the audience is a close friend or informal peer group",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "Please make this message formal.",
+        "I use formal wording only for professors, job applications, and official requests.",
+        "The formal style in this message is role-specific rather than my global preference."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "The previous preference is outside its valid scope here, so I will match the recipient naturally rather than imposing a formal style."
+  },
+  {
+    "family": "writing_formality",
+    "zone": "inside",
+    "history": "Session 1: I am casual and playful with friends.\nSession 2: The assistant previously helped summarize a news article.\nSession 3: Please make this message formal.\nSession 4: I use formal wording only for professors, job applications, and official requests.\nSession 5: Another conversation concerned a book recommendation unrelated to this preference.\nSession 6: The formal style in this message is role-specific rather than my global preference.",
+    "query": "Help me contact the department office about a formal request.",
+    "gold_action": "APPLY",
+    "predicted_action": "APPLY",
+    "structured_memory": {
+      "preference": "formal tone",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the audience is a professor, employer, or official institution",
+      "does_not_apply_when": "the audience is a close friend or informal peer group",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "Please make this message formal.",
+        "I use formal wording only for professors, job applications, and official requests.",
+        "The formal style in this message is role-specific rather than my global preference."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "I will use the stored preference and use polished, professional, and formally structured language."
+  },
+  {
+    "family": "writing_formality",
+    "zone": "near",
+    "history": "Session 1: Earlier, we discussed a calendar reminder and a grocery list.\nSession 2: I am casual and playful with friends.\nSession 3: Please make this message formal.\nSession 4: I use formal wording only for professors, job applications, and official requests.\nSession 5: A separate session involved planning a routine appointment.\nSession 6: The formal style in this message is role-specific rather than my global preference.",
+    "query": "Draft a note to an acquaintance without knowing whether the setting is formal.",
+    "gold_action": "CLARIFY",
+    "predicted_action": "CLARIFY",
+    "structured_memory": {
+      "preference": "formal tone",
+      "owner": "user",
+      "information_type": "contextual_preference",
+      "applies_when": "the audience is a professor, employer, or official institution",
+      "does_not_apply_when": "the audience is a close friend or informal peer group",
+      "temporal_validity": "context-dependent",
+      "confidence": 0.955,
+      "evidence": [
+        "Please make this message formal.",
+        "I use formal wording only for professors, job applications, and official requests.",
+        "The formal style in this message is role-specific rather than my global preference."
+      ],
+      "permission": "response_personalization"
+    },
+    "generated_demo_response": "Who is the recipient, and should the message sound official or casual?"
+  }
+]
