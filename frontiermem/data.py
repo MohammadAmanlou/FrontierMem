@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Sequence
-import random
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from random import Random
+from typing import Iterable, Sequence
+
 import pandas as pd
 
 
@@ -11,605 +13,811 @@ class ScenarioSpec:
     family: str
     domain: str
     preference_label: str
-    surface_anchor: str
+    surface_anchors: Sequence[str]
     stable_context: Sequence[str]
     scoped_context: Sequence[str]
     scoped_type: str
     applies_when: str
-    not_when: str
-    shared_queries: Sequence[str]
-    crossing_queries: Sequence[str]
-    uncertain_queries: Sequence[str]
-    match_terms: Sequence[str]
-    mismatch_terms: Sequence[str]
+    does_not_apply_when: str
+    train_inside_queries: Sequence[str]
+    test_inside_queries: Sequence[str]
+    train_outside_queries: Sequence[str]
+    test_outside_queries: Sequence[str]
+    train_near_queries: Sequence[str]
+    test_near_queries: Sequence[str]
     clarification_question: str
     apply_response: str
     neutral_response: str
+    owner: str = "user"
 
 
-FILLERS = [
-    "Earlier, we discussed a calendar reminder and a grocery list.",
-    "The user also asked for help rephrasing a short technical note.",
-    "A separate session involved planning a routine appointment.",
-    "Another conversation concerned a book recommendation unrelated to this preference.",
-    "The assistant previously helped summarize a news article.",
-    "There was also a short exchange about organizing files on a laptop.",
-]
+FILLERS = (
+    "We also discussed a calendar reminder for next month.",
+    "Another short conversation concerned a book recommendation.",
+    "There was a separate exchange about organizing files on a laptop.",
+    "We briefly talked about a grocery list for the weekend.",
+    "A different session was about fixing a small Python error.",
+    "We also discussed the weather for an unrelated day trip.",
+    "Another message asked for a summary of a news article.",
+    "There was an unrelated request to rename several documents.",
+)
 
 
-SPECS: List[ScenarioSpec] = [
+SPECS: tuple[ScenarioSpec, ...] = (
     ScenarioSpec(
-        family="travel_budget",
-        domain="travel",
-        preference_label="budget-conscious accommodation",
-        surface_anchor="For this trip, please find a cheap but clean hotel.",
-        stable_context=[
-            "I generally choose the least expensive clean hotel, even when someone else pays.",
-            "Across my trips, I care more about price than luxury.",
-            "Saving money on accommodation is a persistent priority for me.",
-        ],
-        scoped_context=[
-            "I usually enjoy comfortable premium hotels.",
-            "This trip is different because the university reimbursement cap is strict.",
-            "The low price request is only for this capped trip, not a general travel preference.",
-        ],
-        scoped_type="temporary_constraint",
-        applies_when="the traveler is paying personally or a strict reimbursement cap applies",
-        not_when="the trip is fully reimbursed without a cap",
-        shared_queries=[
-            "I am paying for this trip myself and my budget is tight. Which hotel should I choose?",
-            "For a self-funded weekend with a strict budget, recommend a hotel.",
-            "I need accommodation that stays within my limited personal budget.",
-        ],
-        crossing_queries=[
-            "My employer will cover the full hotel cost with no reimbursement cap. What should I book?",
-            "This conference hotel is fully paid by the company, so cost is not constrained.",
-            "The university confirmed unlimited hotel reimbursement for this trip.",
-        ],
-        uncertain_queries=[
-            "Find a hotel for my next conference trip; I do not know the reimbursement details yet.",
-            "Recommend accommodation for a work trip, but the payment policy is still unclear.",
-            "I need a hotel for a conference and have not checked who will pay.",
-        ],
-        match_terms=["paying", "self-funded", "strict budget", "limited personal budget", "cap applies"],
-        mismatch_terms=["no reimbursement cap", "fully paid", "unlimited hotel reimbursement", "cost is not constrained"],
-        clarification_question="Will you pay personally, or is this trip reimbursed without a cap?",
-        apply_response="prioritize clean, well-reviewed budget hotels",
-        neutral_response="compare comfort, location, and quality without forcing the cheapest option",
+        family="writing_conciseness",
+        domain="writing",
+        preference_label="concise answers",
+        surface_anchors=(
+            "Please keep this answer short and direct.",
+            "For this request, give me only the key points.",
+        ),
+        stable_context=(
+            "I generally prefer concise answers across most tasks.",
+            "Even when I have time, I usually want the direct answer first.",
+            "Brevity is a persistent interaction preference for me.",
+            "Across our conversations, short responses are my default.",
+        ),
+        scoped_context=(
+            "I am about to join a meeting, so this request is unusually urgent.",
+            "The short answer is only for time-pressured situations.",
+            "When learning something new, I normally want a detailed explanation.",
+            "This is not a general preference for every conversation.",
+        ),
+        scoped_type="temporary_state",
+        applies_when="the request is urgent, exam-like, or explicitly asks for a direct answer",
+        does_not_apply_when="the user is learning a new concept or preparing a detailed presentation",
+        train_inside_queries=(
+            "I have two minutes before an exam; just give the answer.",
+            "This is urgent, so reply with only the conclusion.",
+            "Give me a direct answer without the derivation this time.",
+        ),
+        test_inside_queries=(
+            "I am in a hurry; provide only the final result.",
+            "Treat this as a rapid-fire question and keep it brief.",
+        ),
+        train_outside_queries=(
+            "Teach me this unfamiliar topic from the beginning with full reasoning.",
+            "I am preparing a research talk and need a thorough explanation.",
+            "Walk me through the concept carefully with examples.",
+        ),
+        test_outside_queries=(
+            "I want to understand this deeply, so explain each step.",
+            "This is for learning, not an exam; give me the detailed version.",
+        ),
+        train_near_queries=(
+            "Explain this to me, but I have not decided how much detail I want.",
+            "I need an answer, although the desired level of detail is unclear.",
+            "Respond in the style I need, but I have not specified the context.",
+        ),
+        test_near_queries=(
+            "Should this be a quick answer or a tutorial? I have not decided.",
+            "I am unsure whether I need the summary or the full explanation.",
+        ),
+        clarification_question="Would you like only the final answer, or a detailed step-by-step explanation?",
+        apply_response="I will keep the answer concise and give the main result first.",
+        neutral_response="I will not force the earlier brevity preference onto this learning request.",
     ),
     ScenarioSpec(
         family="writing_formality",
         domain="writing",
-        preference_label="formal tone",
-        surface_anchor="Please make this message formal.",
-        stable_context=[
-            "I generally prefer formal wording in written communication, even with people I know well.",
-            "A polished and professional tone is my default across audiences.",
-            "I consistently choose formality over casual phrasing.",
-        ],
-        scoped_context=[
-            "I am casual and playful with friends.",
-            "I use formal wording only for professors, job applications, and official requests.",
-            "The formal style in this message is role-specific rather than my global preference.",
-        ],
+        preference_label="formal writing style",
+        surface_anchors=(
+            "Please rewrite this message in a formal tone.",
+            "Make this draft professional and formal.",
+        ),
+        stable_context=(
+            "I consistently prefer formal wording in written communication.",
+            "Professional language is my default even with familiar colleagues.",
+            "Across audiences, I generally avoid casual expressions.",
+            "A formal tone is a stable writing preference for me.",
+        ),
+        scoped_context=(
+            "This draft is addressed to a professor, so the audience requires formality.",
+            "I use a relaxed tone with friends and close teammates.",
+            "The formal request applies only to academic or official recipients.",
+            "It is an audience-specific requirement, not my universal style.",
+        ),
         scoped_type="contextual_preference",
-        applies_when="the audience is a professor, employer, or official institution",
-        not_when="the audience is a close friend or informal peer group",
-        shared_queries=[
-            "Draft an email to my professor requesting a meeting.",
-            "Write a cover message for a job application.",
-            "Help me contact the department office about a formal request.",
-        ],
-        crossing_queries=[
-            "Write a quick message to my closest friend about dinner tonight.",
-            "Help me reply in our casual friend group chat.",
-            "Draft a playful note to a friend I have known for years.",
-        ],
-        uncertain_queries=[
-            "Write a message to a colleague; I have not said how close we are.",
-            "Help me contact someone from my network, but the relationship is unclear.",
-            "Draft a note to an acquaintance without knowing whether the setting is formal.",
-        ],
-        match_terms=["professor", "job application", "department office", "formal request", "employer"],
-        mismatch_terms=["closest friend", "friend group", "playful note", "casual"],
-        clarification_question="Who is the recipient, and should the message sound official or casual?",
-        apply_response="use polished, professional, and formally structured language",
-        neutral_response="match the recipient naturally rather than imposing a formal style",
+        applies_when="the recipient is a professor, administrator, employer, or other official audience",
+        does_not_apply_when="the recipient is a close friend or an informal peer group",
+        train_inside_queries=(
+            "Rewrite this email to the department chair.",
+            "Prepare a message for a scholarship committee.",
+            "Polish this note before I send it to my supervisor.",
+        ),
+        test_inside_queries=(
+            "Draft a reply to the university administration.",
+            "Help me write to a potential employer.",
+        ),
+        train_outside_queries=(
+            "Write a funny message to my closest friend.",
+            "Turn this into a casual text for my roommates.",
+            "Help me reply informally in our gaming group.",
+        ),
+        test_outside_queries=(
+            "Make this sound natural for a group chat with friends.",
+            "Write a playful note to my cousin.",
+        ),
+        train_near_queries=(
+            "Rewrite this message, but I have not said who will receive it.",
+            "Improve the tone; the audience is still unknown.",
+            "Make this message appropriate, although I have not identified the recipient.",
+        ),
+        test_near_queries=(
+            "Polish this text; I am not sure yet whether it is for a professor or a friend.",
+            "Adjust the tone, but the recipient has not been decided.",
+        ),
+        clarification_question="Who is the recipient: an official contact or someone you know casually?",
+        apply_response="I will use a formal, professional tone suitable for the recipient.",
+        neutral_response="I will use a natural informal tone rather than transferring the official style.",
+    ),
+    ScenarioSpec(
+        family="writing_directness",
+        domain="writing",
+        preference_label="direct communication",
+        surface_anchors=(
+            "Please make the message very direct.",
+            "Remove hedging and state the request clearly.",
+        ),
+        stable_context=(
+            "I generally value direct communication, even in sensitive discussions.",
+            "Across contexts, I prefer people to state the point clearly.",
+            "Avoiding unnecessary hedging is a persistent preference of mine.",
+            "Direct wording is my default style.",
+        ),
+        scoped_context=(
+            "This is an internal logistics message where speed matters.",
+            "For emotional or conflict-sensitive conversations, I prefer gentler wording.",
+            "The direct style is limited to operational requests.",
+            "It is not my general approach for every audience.",
+        ),
+        scoped_type="contextual_preference",
+        applies_when="the message concerns logistics, deadlines, or clear task assignment",
+        does_not_apply_when="the message addresses grief, conflict, rejection, or another sensitive situation",
+        train_inside_queries=(
+            "Tell the team that the file is due by noon.",
+            "Assign the remaining tasks and state the deadline.",
+            "Write a clear request for the missing document.",
+        ),
+        test_inside_queries=(
+            "Send a straightforward reminder about tomorrow's submission.",
+            "Ask the contractor to fix the issue by Friday.",
+        ),
+        train_outside_queries=(
+            "Help me comfort a friend who is grieving.",
+            "Write a tactful rejection after a difficult interview.",
+            "Respond gently to a teammate who feels hurt.",
+        ),
+        test_outside_queries=(
+            "Help me apologize after an emotional argument.",
+            "Write a compassionate message to someone facing bad news.",
+        ),
+        train_near_queries=(
+            "Draft a message, but I have not explained whether the topic is sensitive.",
+            "Make this appropriate; the emotional stakes are unclear.",
+            "I need a reply, but I have not described the relationship or situation.",
+        ),
+        test_near_queries=(
+            "Write the message, although I have not said whether this is a conflict.",
+            "Choose the level of directness, but the context is still ambiguous.",
+        ),
+        clarification_question="Is this a routine logistical request, or a sensitive interpersonal message?",
+        apply_response="I will state the request directly and remove unnecessary hedging.",
+        neutral_response="I will use gentler wording because the earlier direct style does not fit this context.",
     ),
     ScenarioSpec(
         family="education_detail",
         domain="education",
         preference_label="detailed step-by-step explanations",
-        surface_anchor="Explain it step by step and include the reasoning.",
-        stable_context=[
-            "I learn best through detailed explanations and usually want every reasoning step.",
-            "Even under time pressure, I prefer understanding the full derivation.",
-            "Depth is a stable learning preference for me across technical subjects.",
-        ],
-        scoped_context=[
-            "When I am learning a new concept, I want detailed explanations.",
-            "During timed quizzes, I only want the final answer so I can move quickly.",
-            "The desired level of detail depends on whether I am learning or being tested.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the user is learning a new or unfamiliar concept",
-        not_when="the user is in a timed quiz or explicitly requests only the final answer",
-        shared_queries=[
-            "Teach me this theorem from the beginning; it is new to me.",
-            "I am learning this algorithm for the first time. Can you explain it?",
-            "Help me understand a new concept rather than just giving the result.",
-        ],
-        crossing_queries=[
-            "I am in a timed quiz. Give only the final option.",
-            "This is an exam question and I need the direct answer immediately.",
-            "I have thirty seconds left; just state the result.",
-        ],
-        uncertain_queries=[
-            "Help me review this topic.",
-            "Can you go over this problem with me?",
-            "Explain this material, but I have not said how much detail I need.",
-        ],
-        match_terms=["new to me", "first time", "understand a new concept", "teach me"],
-        mismatch_terms=["timed quiz", "exam question", "only the final", "thirty seconds", "just state"],
-        clarification_question="Do you want a quick final answer or a full step-by-step explanation?",
-        apply_response="give a structured, step-by-step explanation with explicit reasoning",
-        neutral_response="provide the direct result without adding unnecessary derivation",
+        surface_anchors=(
+            "Please explain this step by step.",
+            "I want a detailed explanation with the intermediate reasoning.",
+        ),
+        stable_context=(
+            "I consistently learn best from detailed step-by-step explanations.",
+            "Even for familiar material, I prefer seeing the reasoning process.",
+            "Detailed teaching is a stable learning preference for me.",
+            "Across subjects, examples and intermediate steps help me most.",
+        ),
+        scoped_context=(
+            "This topic is new to me, so I need extra detail for this lesson.",
+            "For routine checks and timed quizzes, I usually want only the answer.",
+            "The detailed request is limited to unfamiliar learning material.",
+            "It is not a universal response-style preference.",
+        ),
+        scoped_type="current_goal",
+        applies_when="the user is learning unfamiliar material or explicitly studying for understanding",
+        does_not_apply_when="the user is checking a known result or taking a timed quiz",
+        train_inside_queries=(
+            "Teach me this concept; I have never studied it before.",
+            "I am learning this chapter and need the full derivation.",
+            "Explain every step because the method is unfamiliar.",
+        ),
+        test_inside_queries=(
+            "I am new to this subject, so build the explanation from first principles.",
+            "Help me truly learn the method with all intermediate steps.",
+        ),
+        train_outside_queries=(
+            "I know the method; just verify my final answer.",
+            "This is a timed quiz, so give only the correct option.",
+            "Check whether my result is right without reteaching the topic.",
+        ),
+        test_outside_queries=(
+            "I only need a quick correctness check on a familiar exercise.",
+            "For this speed test, return the final answer only.",
+        ),
+        train_near_queries=(
+            "Answer this question, but I have not said whether I am learning or checking.",
+            "I need help with the problem; my familiarity is unknown.",
+            "Explain it appropriately, although my goal is not specified.",
+        ),
+        test_near_queries=(
+            "I need assistance, but I have not said whether this is study or verification.",
+            "Choose the amount of explanation; my current goal is unclear.",
+        ),
+        clarification_question="Are you learning this from scratch, or do you only want the final answer checked?",
+        apply_response="I will explain the method carefully and include the intermediate steps.",
+        neutral_response="I will provide a concise verification rather than a full tutorial.",
     ),
     ScenarioSpec(
-        family="food_health",
-        domain="food",
-        preference_label="healthy meals",
-        surface_anchor="Please suggest a healthy meal for me.",
-        stable_context=[
-            "I consistently prioritize nutritious meals, including on celebrations and weekends.",
-            "Health is more important to me than indulgence in nearly every food decision.",
-            "Choosing healthy food is a long-term preference, not a short diet phase.",
-        ],
-        scoped_context=[
-            "I normally enjoy indulgent food on social occasions.",
-            "I am following a strict healthy meal plan only until my race this Sunday.",
-            "The current healthy choices are a temporary training constraint.",
-        ],
+        family="education_examples",
+        domain="education",
+        preference_label="example-driven teaching",
+        surface_anchors=(
+            "Please teach this with several concrete examples.",
+            "Use examples rather than only abstract definitions.",
+        ),
+        stable_context=(
+            "I generally understand ideas best through concrete examples.",
+            "Across technical subjects, examples are my preferred learning method.",
+            "I consistently ask for at least one worked example.",
+            "Example-driven teaching is a stable preference for me.",
+        ),
+        scoped_context=(
+            "This concept is unusually abstract, so examples are needed for this topic.",
+            "For reference sheets, I prefer compact definitions without examples.",
+            "The request for examples applies only to abstract learning sessions.",
+            "It is not required in every educational response.",
+        ),
+        scoped_type="contextual_preference",
+        applies_when="the concept is abstract, unfamiliar, or explicitly taught for understanding",
+        does_not_apply_when="the user requests a compact reference, formula sheet, or glossary entry",
+        train_inside_queries=(
+            "Explain this abstract idea using a real-world example.",
+            "Teach the concept with a worked numerical case.",
+            "I cannot visualize this; give me concrete examples.",
+        ),
+        test_inside_queries=(
+            "Use an illustrative case to make this unfamiliar idea clear.",
+            "Show how the concept works in a practical example.",
+        ),
+        train_outside_queries=(
+            "Create a one-page formula sheet with no examples.",
+            "Give me a compact glossary definition.",
+            "List the rules only; I am making a reference card.",
+        ),
+        test_outside_queries=(
+            "Produce a terse cheat sheet containing definitions only.",
+            "I need a compact reference entry, not a worked example.",
+        ),
+        train_near_queries=(
+            "Explain this, but I have not said whether it is for learning or reference.",
+            "Prepare the material; the intended format is unclear.",
+            "I need a description, although I have not specified whether examples are useful.",
+        ),
+        test_near_queries=(
+            "Help with this concept, but the final use of the answer is unknown.",
+            "Choose whether to include examples; I have not stated my purpose.",
+        ),
+        clarification_question="Is this for learning the idea, or for a compact reference sheet?",
+        apply_response="I will include concrete examples and connect them to the abstract idea.",
+        neutral_response="I will keep this as a compact reference without adding worked examples.",
+    ),
+    ScenarioSpec(
+        family="education_answer_only",
+        domain="education",
+        preference_label="answer-only assistance",
+        surface_anchors=(
+            "Just tell me the correct answer.",
+            "For this question, do not include the derivation.",
+        ),
+        stable_context=(
+            "I consistently prefer answer-only assistance for exercises.",
+            "Across subjects, I usually work through the reasoning independently.",
+            "The final result is my persistent preference when asking for help.",
+            "Even without time pressure, I want only the answer.",
+        ),
+        scoped_context=(
+            "This is a timed practice round, so I need only the answer right now.",
+            "Outside timed practice, I normally want explanations and hints.",
+            "The answer-only request is limited to speed drills.",
+            "It is a temporary task constraint, not my general learning style.",
+        ),
         scoped_type="temporary_constraint",
-        applies_when="the meal occurs during the current pre-race training period",
-        not_when="the race has ended and the user is attending a celebration",
-        shared_queries=[
-            "It is three days before my race. What should I eat tonight?",
-            "Suggest dinner during my current training week.",
-            "I need a meal while I am still following the pre-race plan.",
-        ],
-        crossing_queries=[
-            "The race is over and tonight is my birthday celebration. What should I order?",
-            "Recommend food for a celebration next month, long after the training plan ends.",
-            "I finished the race and want a relaxed social dinner.",
-        ],
-        uncertain_queries=[
-            "Suggest dinner for an upcoming weekend, but I have not said whether it is before the race.",
-            "What should I eat on a date whose timing relative to the race is unclear?",
-            "Recommend a meal for later; the training schedule is not specified.",
-        ],
-        match_terms=["before my race", "training week", "pre-race plan", "three days before"],
-        mismatch_terms=["race is over", "next month", "finished the race", "birthday celebration"],
-        clarification_question="Is this meal during the pre-race plan or after the race has ended?",
-        apply_response="recommend a nutritious meal aligned with the health goal",
-        neutral_response="consider the occasion and current goal instead of assuming a strict healthy plan",
+        applies_when="the user is in a timed drill, speed test, or explicitly requests answer-only output",
+        does_not_apply_when="the user is studying, reviewing mistakes, or asks for conceptual understanding",
+        train_inside_queries=(
+            "This is a sixty-second drill; return only the option.",
+            "I am timing myself, so give the answer without explanation.",
+            "For this speed round, output only the result.",
+        ),
+        test_inside_queries=(
+            "I have almost no time; state only the correct choice.",
+            "Treat this as a rapid quiz and skip the reasoning.",
+        ),
+        train_outside_queries=(
+            "Review my mistake and explain why the correct answer works.",
+            "I am studying this topic and want to understand the reasoning.",
+            "Teach me how to solve similar questions next time.",
+        ),
+        test_outside_queries=(
+            "Help me learn from this error with a full explanation.",
+            "I am no longer timing myself; show me the reasoning.",
+        ),
+        train_near_queries=(
+            "Help with this question, but I have not said whether it is timed.",
+            "Give me the appropriate response; my purpose is unclear.",
+            "I need assistance, although I have not specified drill or study mode.",
+        ),
+        test_near_queries=(
+            "Respond to the problem, but I have not described the learning context.",
+            "I am unsure whether I want speed or explanation for this one.",
+        ),
+        clarification_question="Is this a timed drill where you want only the answer, or a study question requiring explanation?",
+        apply_response="I will provide only the final answer.",
+        neutral_response="I will explain the reasoning because the answer-only constraint does not apply here.",
+    ),
+    ScenarioSpec(
+        family="travel_budget",
+        domain="travel",
+        preference_label="budget-conscious accommodation",
+        surface_anchors=(
+            "For this trip, please find a cheap but clean hotel.",
+            "Recommend an inexpensive hotel that is still acceptable.",
+        ),
+        stable_context=(
+            "I generally choose the least expensive clean hotel, even when someone else pays.",
+            "Across my trips, I care more about price than luxury.",
+            "Saving money on accommodation is a persistent priority for me.",
+            "Budget hotels are my default travel preference.",
+        ),
+        scoped_context=(
+            "I usually enjoy comfortable premium hotels.",
+            "This trip is different because the university reimbursement cap is strict.",
+            "The low-price request is only for this capped trip.",
+            "Cheap accommodation is not a general travel preference for me.",
+        ),
+        scoped_type="temporary_constraint",
+        applies_when="the traveler is paying personally or a strict reimbursement cap applies",
+        does_not_apply_when="the trip is fully reimbursed without a cap",
+        train_inside_queries=(
+            "I am paying for this trip myself and my budget is tight.",
+            "For a self-funded weekend with a strict budget, recommend a hotel.",
+            "I need accommodation that stays within my limited personal budget.",
+        ),
+        test_inside_queries=(
+            "This journey comes out of my own pocket, so cost matters a lot.",
+            "Find lodging for a trip with a firm reimbursement ceiling.",
+        ),
+        train_outside_queries=(
+            "My employer will cover the full hotel cost with no reimbursement cap.",
+            "This conference hotel is fully paid by the company.",
+            "The university confirmed unlimited hotel reimbursement.",
+        ),
+        test_outside_queries=(
+            "The organization is paying and there is no spending limit for lodging.",
+            "Accommodation is completely reimbursed, without a price ceiling.",
+        ),
+        train_near_queries=(
+            "I do not know the reimbursement details yet.",
+            "The payment policy is still unclear.",
+            "I have not checked who will pay for the hotel.",
+        ),
+        test_near_queries=(
+            "I need a hotel, but the funding arrangement has not been decided.",
+            "It is unclear whether I or the sponsor will cover accommodation.",
+        ),
+        clarification_question="Will you pay personally, or is this trip reimbursed without a cap?",
+        apply_response="I will prioritize inexpensive, clean accommodation.",
+        neutral_response="I will consider comfort and quality rather than assuming price is the main criterion.",
     ),
     ScenarioSpec(
         family="travel_proximity",
         domain="travel",
         preference_label="accommodation close to the destination",
-        surface_anchor="Please find a hotel very close to the venue.",
-        stable_context=[
-            "I strongly dislike commuting and almost always choose the closest practical hotel.",
-            "Location is my main travel criterion across business and leisure trips.",
-            "I am willing to pay more to avoid a long daily commute.",
-        ],
-        scoped_context=[
-            "For leisure travel, I often stay farther away to explore different neighborhoods.",
-            "I need a hotel near the venue only on one-day business trips with a packed schedule.",
-            "The proximity request is tied to short business travel, not all trips.",
-        ],
-        scoped_type="contextual_preference",
+        surface_anchors=(
+            "Find a hotel as close to the venue as possible.",
+            "For this trip, prioritize walking distance to the destination.",
+        ),
+        stable_context=(
+            "I generally prioritize location over hotel amenities.",
+            "Across trips, staying close to the main destination is my default.",
+            "Even on relaxed vacations, I dislike long travel from the hotel.",
+            "Proximity is a persistent accommodation preference for me.",
+        ),
+        scoped_context=(
+            "This is a one-day business visit with meetings from early morning.",
+            "The tight schedule makes proximity important only for this trip.",
+            "On normal vacations, I prefer quieter hotels outside crowded centers.",
+            "The walking-distance request is not a general preference.",
+        ),
+        scoped_type="current_goal",
         applies_when="the trip is a short business visit with a tightly packed schedule",
-        not_when="the trip is a relaxed multi-day leisure vacation",
-        shared_queries=[
-            "I have a one-day business trip with meetings all day. Where should I stay?",
-            "Recommend a hotel for a short work visit with no commuting time available.",
-            "I need accommodation for a packed overnight business schedule.",
-        ],
-        crossing_queries=[
-            "I am taking a relaxed week-long vacation and want to explore several neighborhoods.",
-            "Recommend a hotel for a long leisure trip where commuting is acceptable.",
-            "This is a slow-paced holiday rather than a business visit.",
-        ],
-        uncertain_queries=[
-            "Find a hotel for my next trip; I have not said whether it is business or leisure.",
-            "Recommend accommodation without knowing the trip length or schedule.",
-            "I need a place to stay, but the purpose of the trip is unclear.",
-        ],
-        match_terms=["one-day business", "short work visit", "packed overnight", "meetings all day"],
-        mismatch_terms=["week-long vacation", "long leisure", "slow-paced holiday", "commuting is acceptable"],
-        clarification_question="Is this a short, tightly scheduled business trip or a relaxed leisure trip?",
-        apply_response="prioritize hotels within a very short walk of the main destination",
-        neutral_response="balance neighborhood quality, price, and experience rather than forcing proximity",
+        does_not_apply_when="the trip is a relaxed multi-day leisure vacation",
+        train_inside_queries=(
+            "I have back-to-back meetings and only one night in the city.",
+            "This is a short work visit with an early event at the venue.",
+            "I need to walk to several meetings during a packed day.",
+        ),
+        test_inside_queries=(
+            "The schedule is compressed and I must reach the conference hall before dawn.",
+            "I am visiting for one busy workday with no time for commuting.",
+        ),
+        train_outside_queries=(
+            "This is a relaxed week-long holiday and I want a quiet neighborhood.",
+            "I have many free days and prefer staying outside the tourist center.",
+            "For this leisurely vacation, a peaceful area matters more than proximity.",
+        ),
+        test_outside_queries=(
+            "The trip is an unhurried retreat, so I would rather stay away from downtown.",
+            "I have a long holiday and do not mind traveling to attractions.",
+        ),
+        train_near_queries=(
+            "I need a hotel, but I have not described the trip schedule.",
+            "Recommend accommodation; the length and pace of the trip are unknown.",
+            "I have not said whether this visit is business or leisure.",
+        ),
+        test_near_queries=(
+            "Suggest lodging, although I have not decided the trip itinerary.",
+            "The purpose and schedule of the visit are still unclear.",
+        ),
+        clarification_question="Is this a tightly scheduled short visit, or a relaxed leisure trip?",
+        apply_response="I will prioritize hotels close to the main destination.",
+        neutral_response="I will consider quieter or more comfortable areas instead of assuming proximity is essential.",
     ),
     ScenarioSpec(
-        family="writing_concise",
-        domain="writing",
-        preference_label="concise responses",
-        surface_anchor="Keep the answer very short.",
-        stable_context=[
-            "I generally prefer concise answers across routine, academic, and professional tasks.",
-            "Extra detail usually distracts me, even when there is no deadline.",
-            "Brevity is a persistent interaction preference for me.",
-        ],
-        scoped_context=[
-            "I normally appreciate explanation and context.",
-            "I asked for a short answer only because an urgent deadline was minutes away.",
-            "The brevity request is a temporary time constraint rather than a stable preference.",
-        ],
-        scoped_type="temporary_constraint",
-        applies_when="the user is under an immediate deadline or explicitly requests brevity",
-        not_when="there is enough time and the user is learning or planning",
-        shared_queries=[
-            "My meeting starts in five minutes. Summarize the result.",
-            "I have an immediate deadline; give me the shortest useful answer.",
-            "This is urgent, so keep the response brief.",
-        ],
-        crossing_queries=[
-            "Help me deeply understand this research proposal; there is no deadline.",
-            "I am planning for next month and want a complete explanation.",
-            "Teach me this carefully when time is not a constraint.",
-        ],
-        uncertain_queries=[
-            "Help me answer this question.",
-            "Can you respond to this request?",
-            "Explain this, but I have not specified the desired level of detail.",
-        ],
-        match_terms=["five minutes", "immediate deadline", "urgent", "keep the response brief"],
-        mismatch_terms=["deeply understand", "no deadline", "complete explanation", "time is not a constraint"],
-        clarification_question="Do you want a brief answer or a more complete explanation?",
-        apply_response="produce a compact answer with only the essential information",
-        neutral_response="use the amount of detail appropriate for the task instead of forcing brevity",
-    ),
-    ScenarioSpec(
-        family="education_examples",
-        domain="education",
-        preference_label="example-driven explanations",
-        surface_anchor="Please include concrete examples.",
-        stable_context=[
-            "I consistently understand concepts better through examples in every subject.",
-            "Even in theoretical mathematics, examples help me before formal definitions.",
-            "Example-first teaching is a stable preference for me.",
-        ],
-        scoped_context=[
-            "Examples are especially useful to me for programming and applied tasks.",
-            "For pure mathematics, I prefer a formal proof without illustrative examples.",
-            "My preference depends on the subject rather than applying globally.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the topic is programming or an applied technical task",
-        not_when="the task is a pure mathematics proof",
-        shared_queries=[
-            "Teach me this Python concept and show a working example.",
-            "Explain this programming pattern in an applied coding task.",
-            "Help me learn an API through a concrete code example.",
-        ],
-        crossing_queries=[
-            "Prove this abstract algebra theorem formally.",
-            "I need a rigorous pure mathematics proof.",
-            "Write the formal proof without relying on an illustrative case.",
-        ],
-        uncertain_queries=[
-            "Explain this statistics concept; I have not said whether I want examples or a formal derivation.",
-            "Teach me a technical idea whose subject type is unclear.",
-            "Help me understand this concept, but the desired style is unspecified.",
-        ],
-        match_terms=["Python", "programming", "coding", "API", "working example"],
-        mismatch_terms=["abstract algebra", "pure mathematics proof", "formal proof", "without relying"],
-        clarification_question="Would you prefer a concrete example or a formal derivation for this topic?",
-        apply_response="lead with a concrete example and then connect it to the concept",
-        neutral_response="use a formal explanation without assuming examples are desired",
-    ),
-    ScenarioSpec(
-        family="food_vegetarian_ownership",
-        domain="food",
-        preference_label="vegetarian food",
-        surface_anchor="Please make sure there are vegetarian options.",
-        stable_context=[
-            "I do not eat meat and have followed a vegetarian diet for several years.",
-            "The dietary preference belongs to me personally.",
-            "I need vegetarian choices whenever food is selected for me.",
-        ],
-        scoped_context=[
-            "I eat meat and do not follow a vegetarian diet.",
-            "My sister is vegetarian, so I request vegetarian options only when she joins.",
-            "The preference belongs to another person rather than to me.",
-        ],
-        scoped_type="other_owner",
-        applies_when="the meal includes the vegetarian sister",
-        not_when="the meal is only for the user",
-        shared_queries=[
-            "Plan dinner for me and my vegetarian sister.",
-            "Recommend a restaurant for a meal where my sister will join.",
-            "Choose food for a family dinner that includes my vegetarian sibling.",
-        ],
-        crossing_queries=[
-            "Suggest lunch only for me; my sister is not coming.",
-            "What should I eat alone today?",
-            "Recommend a meal for the user only, with no vegetarian guest.",
-        ],
-        uncertain_queries=[
-            "Plan a group dinner, but I have not listed the guests.",
-            "Recommend a restaurant for an event whose attendees are unknown.",
-            "Choose food for a gathering without knowing whether my sister will join.",
-        ],
-        match_terms=["vegetarian sister", "sister will join", "vegetarian sibling", "includes my"],
-        mismatch_terms=["only for me", "eat alone", "sister is not coming", "no vegetarian guest"],
-        clarification_question="Will your vegetarian sister be part of this meal, or is it only for you?",
-        apply_response="ensure the recommendation includes strong vegetarian choices",
-        neutral_response="do not assume the user personally requires vegetarian food",
-    ),
-    ScenarioSpec(
-        family="writing_directness",
-        domain="writing",
-        preference_label="direct wording",
-        surface_anchor="Make the message direct and straightforward.",
-        stable_context=[
-            "I generally prefer direct communication, even in delicate situations.",
-            "I value clarity over softening language across audiences.",
-            "Straightforward wording is my stable communication style.",
-        ],
-        scoped_context=[
-            "I prefer direct wording for task instructions and operational messages.",
-            "For apologies or emotionally sensitive conversations, I want tactful language.",
-            "Directness applies to task coordination, not every social context.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the message gives instructions or coordinates a concrete task",
-        not_when="the message is an apology or emotionally sensitive conversation",
-        shared_queries=[
-            "Write instructions to a teammate about the next task.",
-            "Draft an operational message assigning responsibilities.",
-            "Tell a collaborator exactly what action is needed.",
-        ],
-        crossing_queries=[
-            "Help me apologize to a close friend after an argument.",
-            "Write a sensitive message to someone who is upset.",
-            "Draft a compassionate response about an emotional issue.",
-        ],
-        uncertain_queries=[
-            "Write to a colleague about a concern, but the emotional sensitivity is unclear.",
-            "Help me send a message whose purpose may be corrective or supportive.",
-            "Draft a note without knowing whether it is a task request or a delicate conversation.",
-        ],
-        match_terms=["instructions", "assigning responsibilities", "action is needed", "operational"],
-        mismatch_terms=["apologize", "sensitive message", "emotional issue", "compassionate"],
-        clarification_question="Is this a task-oriented instruction or a sensitive interpersonal message?",
-        apply_response="state the required action clearly and directly",
-        neutral_response="adapt the tone to the interpersonal situation rather than forcing bluntness",
-    ),
-    ScenarioSpec(
-        family="travel_flexibility",
+        family="travel_comfort",
         domain="travel",
-        preference_label="flexible cancellation",
-        surface_anchor="Only show options with flexible cancellation.",
-        stable_context=[
-            "I consistently value flexible cancellation because I dislike being locked into plans.",
-            "I choose refundable bookings even when my schedule looks fixed.",
-            "Flexibility is a stable travel preference for me.",
-        ],
-        scoped_context=[
-            "I normally choose cheaper non-refundable options when dates are fixed.",
-            "I need flexible cancellation only when the schedule is uncertain.",
-            "The request depends on plan uncertainty rather than being a global preference.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the dates or attendance are uncertain",
-        not_when="the trip dates are fixed and guaranteed",
-        shared_queries=[
-            "My dates may change and I might cancel. What should I book?",
-            "Recommend travel options while the schedule is still uncertain.",
-            "The event is not confirmed, so I need a booking strategy.",
-        ],
-        crossing_queries=[
-            "The wedding date is fixed and I am definitely attending.",
-            "My travel dates are guaranteed and cannot change.",
-            "This is a confirmed trip with a completely fixed schedule.",
-        ],
-        uncertain_queries=[
-            "Book travel for next month; I have not said whether the dates may change.",
-            "Recommend a ticket without knowing how certain the schedule is.",
-            "I need a booking, but plan stability is unspecified.",
-        ],
-        match_terms=["may change", "schedule is still uncertain", "not confirmed", "might cancel"],
-        mismatch_terms=["date is fixed", "dates are guaranteed", "completely fixed", "definitely attending"],
-        clarification_question="Are the dates fixed, or is there a meaningful chance the plan will change?",
-        apply_response="prioritize refundable options with flexible cancellation terms",
-        neutral_response="compare price and convenience without automatically paying for flexibility",
+        preference_label="high-comfort travel",
+        surface_anchors=(
+            "For this trip, choose the most comfortable option.",
+            "Prioritize comfort over saving a small amount of money.",
+        ),
+        stable_context=(
+            "I generally prioritize comfort on every trip.",
+            "Even for short journeys, I avoid inconvenient travel options.",
+            "Comfort is a persistent travel preference for me.",
+            "Across trips, I am willing to pay more for an easier experience.",
+        ),
+        scoped_context=(
+            "I am recovering from a temporary back injury.",
+            "Extra comfort is medically useful during this recovery period.",
+            "After recovery, I usually accept basic low-cost travel.",
+            "This comfort requirement is temporary, not a universal preference.",
+        ),
+        scoped_type="temporary_state",
+        applies_when="the user is currently injured, physically exhausted, or needs accessibility support",
+        does_not_apply_when="the user has recovered and is planning a routine low-cost trip",
+        train_inside_queries=(
+            "My back is still painful, so I need an easy journey.",
+            "I am currently recovering and cannot tolerate a difficult itinerary.",
+            "Because of the injury, prioritize comfort and accessibility.",
+        ),
+        test_inside_queries=(
+            "I am not fully healed yet and need the least strenuous option.",
+            "My current physical condition requires extra travel comfort.",
+        ),
+        train_outside_queries=(
+            "I have fully recovered and this is a routine budget trip.",
+            "The injury is gone, and I want the cheapest reasonable route.",
+            "I feel healthy again and do not need premium comfort.",
+        ),
+        test_outside_queries=(
+            "Recovery is complete, so basic transportation is fine now.",
+            "I am healthy and planning an ordinary low-cost journey.",
+        ),
+        train_near_queries=(
+            "Plan the trip, but I have not said whether the injury has healed.",
+            "I need transportation; my current physical condition is unknown.",
+            "Choose an option, although I have not updated you about recovery.",
+        ),
+        test_near_queries=(
+            "Recommend travel, but it is unclear whether I still need accessibility support.",
+            "My present recovery status has not been specified.",
+        ),
+        clarification_question="Do you still need extra comfort or accessibility support for this trip?",
+        apply_response="I will prioritize comfort, accessibility, and a low-strain itinerary.",
+        neutral_response="I will not assume the temporary comfort requirement still applies.",
     ),
     ScenarioSpec(
-        family="food_quickprep",
+        family="food_vegetarian",
         domain="food",
-        preference_label="quick meal preparation",
-        surface_anchor="Suggest something very quick to prepare.",
-        stable_context=[
-            "I generally dislike cooking and almost always want meals that take very little time.",
-            "Even on weekends, I prefer minimal preparation.",
-            "Fast preparation is a stable food preference for me.",
-        ],
-        scoped_context=[
-            "On workdays I need quick meals because my schedule is crowded.",
-            "On relaxed weekends, I enjoy slow and elaborate cooking projects.",
-            "The quick-preparation request is limited to busy weekdays.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the meal is on a busy workday",
-        not_when="the user has a relaxed weekend available for cooking",
-        shared_queries=[
-            "It is a busy Tuesday and I have twenty minutes for dinner.",
-            "Suggest food for a crowded workday evening.",
-            "I need dinner after a long weekday with almost no cooking time.",
-        ],
-        crossing_queries=[
-            "It is a relaxed Sunday and I want to spend the afternoon cooking.",
-            "Recommend a weekend cooking project when I have plenty of time.",
-            "I am free today and want an elaborate homemade meal.",
-        ],
-        uncertain_queries=[
-            "Suggest dinner, but I have not said whether today is busy or relaxed.",
-            "What should I cook on an unspecified day?",
-            "Recommend a meal without knowing how much time I have.",
-        ],
-        match_terms=["busy Tuesday", "workday", "twenty minutes", "almost no cooking time", "crowded"],
-        mismatch_terms=["relaxed Sunday", "weekend cooking project", "plenty of time", "elaborate homemade"],
-        clarification_question="Is this a busy day requiring a quick meal, or do you have time to cook?",
-        apply_response="recommend a meal that can be prepared quickly with minimal steps",
-        neutral_response="consider more elaborate options if the user has time and interest",
+        preference_label="vegetarian meals",
+        surface_anchors=(
+            "Please suggest a vegetarian meal.",
+            "For this request, avoid meat and fish.",
+        ),
+        stable_context=(
+            "I am consistently vegetarian in my own meals.",
+            "Across restaurants and home cooking, I avoid meat and fish.",
+            "Vegetarian eating is a persistent personal preference.",
+            "Even at celebrations, I choose vegetarian dishes.",
+        ),
+        scoped_context=(
+            "The vegetarian guest is my sister, not me.",
+            "I normally eat meat and fish myself.",
+            "This meat-free request applies only when I am cooking for her.",
+            "It should not be stored as my own general diet.",
+        ),
+        scoped_type="other_owner",
+        applies_when="the meal is for the vegetarian sister or another explicitly vegetarian guest",
+        does_not_apply_when="the meal is for the user alone and no vegetarian guest is involved",
+        train_inside_queries=(
+            "My vegetarian sister is joining dinner tonight.",
+            "I am cooking for the same guest who avoids meat.",
+            "Recommend a dish for my sister's vegetarian birthday meal.",
+        ),
+        test_inside_queries=(
+            "The meat-free guest will be eating with us again.",
+            "Plan dinner for my sister, who still follows a vegetarian diet.",
+        ),
+        train_outside_queries=(
+            "I am cooking only for myself tonight and I eat meat.",
+            "My sister is not coming; suggest a meal just for me.",
+            "No vegetarian guests are involved in this dinner.",
+        ),
+        test_outside_queries=(
+            "This meal is solely for me, and I have no meat restriction.",
+            "I am dining alone today; the vegetarian guest is absent.",
+        ),
+        train_near_queries=(
+            "Suggest dinner, but I have not said who will eat it.",
+            "Plan a meal; the guests are still unknown.",
+            "I need a recipe, although I have not identified the diner.",
+        ),
+        test_near_queries=(
+            "Recommend food, but I have not confirmed whether my sister is attending.",
+            "The intended diner has not been specified yet.",
+        ),
+        clarification_question="Is this meal for you, or for the vegetarian guest you mentioned?",
+        apply_response="I will recommend a fully vegetarian meal.",
+        neutral_response="I will not treat another person's diet as your own preference.",
+        owner="sister",
     ),
     ScenarioSpec(
-        family="education_encouragement",
-        domain="education",
-        preference_label="encouraging feedback",
-        surface_anchor="Please be encouraging in your response.",
-        stable_context=[
-            "I generally respond well to motivational and encouraging feedback.",
-            "Even during formal evaluation, supportive phrasing helps me improve.",
-            "An encouraging tone is a stable interaction preference for me.",
-        ],
-        scoped_context=[
-            "When I am struggling with a difficult topic, encouragement helps me persist.",
-            "When I ask for grading or formal evaluation, I prefer neutral and objective feedback.",
-            "The need for encouragement depends on whether I am learning or being assessed.",
-        ],
-        scoped_type="contextual_preference",
-        applies_when="the user is struggling while learning a difficult topic",
-        not_when="the user requests objective grading or formal evaluation",
-        shared_queries=[
-            "I am stuck and discouraged by this hard topic. Help me continue.",
-            "I keep failing to understand this concept and need guidance.",
-            "Teach me this difficult material; I am losing confidence.",
-        ],
-        crossing_queries=[
-            "Grade this solution objectively and list the errors.",
-            "Evaluate my answer using a strict rubric.",
-            "Give a neutral assessment of this submission.",
-        ],
-        uncertain_queries=[
-            "Review my progress, but I have not said whether I want coaching or grading.",
-            "Comment on my work without knowing whether this is practice or evaluation.",
-            "Give feedback, but the desired role is unclear.",
-        ],
-        match_terms=["stuck", "discouraged", "losing confidence", "hard topic"],
-        mismatch_terms=["grade", "strict rubric", "neutral assessment", "objectively"],
-        clarification_question="Would you like supportive coaching or a neutral formal evaluation?",
-        apply_response="use supportive language while still giving actionable guidance",
-        neutral_response="provide objective feedback without adding unnecessary motivational framing",
+        family="food_spiciness",
+        domain="food",
+        preference_label="mild food",
+        surface_anchors=(
+            "Please make the dish mild rather than spicy.",
+            "For this meal, avoid strong chili heat.",
+        ),
+        stable_context=(
+            "I generally dislike spicy food.",
+            "Across cuisines, I consistently choose mild dishes.",
+            "Avoiding chili heat is a persistent preference for me.",
+            "Even when others order spicy food, I select the mild option.",
+        ),
+        scoped_context=(
+            "My stomach is temporarily sensitive because of medication.",
+            "Normally I enjoy very spicy food.",
+            "The mild-food request applies only during this treatment period.",
+            "It is a temporary health constraint, not my usual taste.",
+        ),
+        scoped_type="temporary_state",
+        applies_when="the user is still taking the medication or has an active stomach problem",
+        does_not_apply_when="the treatment has ended and the stomach problem has resolved",
+        train_inside_queries=(
+            "I am still taking the medication and my stomach is sensitive.",
+            "The treatment continues, so recommend something gentle.",
+            "My stomach symptoms are active today.",
+        ),
+        test_inside_queries=(
+            "I remain on the medicine and cannot handle strong chili yet.",
+            "The stomach issue has not resolved, so keep the meal gentle.",
+        ),
+        train_outside_queries=(
+            "The treatment ended and I want my usual spicy food again.",
+            "My stomach has recovered; recommend a hot chili dish.",
+            "I am healthy now and would like strong spice.",
+        ),
+        test_outside_queries=(
+            "The medication is finished and the sensitivity is gone.",
+            "I have recovered and want a dish with plenty of heat.",
+        ),
+        train_near_queries=(
+            "Suggest food, but I have not said whether I am still on the medication.",
+            "I need dinner; my current stomach condition is unclear.",
+            "Recommend a dish, although I have not updated you about treatment.",
+        ),
+        test_near_queries=(
+            "Plan a meal, but it is unknown whether the sensitivity remains.",
+            "I have not said whether the medicine course is complete.",
+        ),
+        clarification_question="Is your stomach still sensitive, or has the temporary restriction ended?",
+        apply_response="I will recommend a mild dish with little or no chili heat.",
+        neutral_response="I will not assume the temporary mild-food restriction still applies.",
     ),
-]
+    ScenarioSpec(
+        family="food_quick_meals",
+        domain="food",
+        preference_label="quick-to-prepare meals",
+        surface_anchors=(
+            "Suggest a meal that takes very little time to prepare.",
+            "For this request, prioritize speed and convenience.",
+        ),
+        stable_context=(
+            "I generally prefer quick meals because I dislike lengthy cooking.",
+            "Across weekdays and weekends, preparation time is a major priority.",
+            "Fast recipes are my persistent cooking preference.",
+            "Even when I am free, I usually choose simple meals.",
+        ),
+        scoped_context=(
+            "This week I have an unusually heavy deadline.",
+            "Normally I enjoy slow cooking when my schedule is open.",
+            "The quick-meal request applies only during the deadline period.",
+            "It is a temporary time constraint, not my general cooking preference.",
+        ),
+        scoped_type="current_goal",
+        applies_when="the user is currently facing a deadline or has very limited cooking time",
+        does_not_apply_when="the deadline has passed and the user has time for relaxed cooking",
+        train_inside_queries=(
+            "The deadline is tomorrow, so I have only fifteen minutes to cook.",
+            "I am still overloaded with work and need a fast dinner.",
+            "My schedule is packed tonight; suggest something quick.",
+        ),
+        test_inside_queries=(
+            "I am racing to finish a project and need food immediately.",
+            "There is almost no cooking time before tonight's deadline.",
+        ),
+        train_outside_queries=(
+            "The deadline is over and I want a slow weekend cooking project.",
+            "I am free today and would enjoy a complex recipe.",
+            "My schedule is open, so preparation time is not a concern.",
+        ),
+        test_outside_queries=(
+            "Work is finished and I have the whole afternoon to cook.",
+            "I am relaxed this weekend and want a time-intensive dish.",
+        ),
+        train_near_queries=(
+            "Suggest a meal, but I have not described today's schedule.",
+            "I need a recipe; my available cooking time is unknown.",
+            "Recommend dinner, although I have not said whether the deadline remains.",
+        ),
+        test_near_queries=(
+            "Plan food for today, but my time constraints are unclear.",
+            "I have not said whether I am still busy or finally free.",
+        ),
+        clarification_question="Are you still under time pressure, or do you have time for a longer recipe?",
+        apply_response="I will prioritize a fast, low-preparation meal.",
+        neutral_response="I will consider a more involved recipe instead of assuming you are still time-constrained.",
+    ),
+)
 
 
-def _history(spec: ScenarioSpec, profile_variant: str, rng: random.Random) -> str:
-    fillers = rng.sample(FILLERS, k=2)
+SPEC_BY_FAMILY = {spec.family: spec for spec in SPECS}
+
+
+def _sample_history(spec: ScenarioSpec, profile_variant: str, rng: Random) -> str:
+    core = list(spec.stable_context if profile_variant == "stable" else spec.scoped_context)
+    rng.shuffle(core)
+    anchor = rng.choice(tuple(spec.surface_anchors))
+    fillers = rng.sample(tuple(FILLERS), k=2)
+    messages = [core[0], fillers[0], anchor, core[1], fillers[1], core[2], core[3]]
+    # Shuffle only the middle while ensuring the anchor and evidence remain visible.
+    middle = messages[1:-1]
+    rng.shuffle(middle)
+    messages = [messages[0], *middle, messages[-1]]
+    return "\n".join(f"Session {i + 1}: {text}" for i, text in enumerate(messages))
+
+
+def _gold_action(profile_variant: str, query_kind: str) -> tuple[str, str]:
     if profile_variant == "stable":
-        core = list(spec.stable_context)
-    else:
-        core = list(spec.scoped_context)
-    ordering = [fillers[0], core[0], spec.surface_anchor, core[1], fillers[1], core[2]]
-    if rng.random() < 0.5:
-        ordering[0], ordering[1] = ordering[1], ordering[0]
-    return "\n".join(f"Session {i+1}: {text}" for i, text in enumerate(ordering))
+        return "APPLY", "inside"
+    if query_kind == "inside":
+        return "APPLY", "inside"
+    if query_kind == "outside":
+        return "IGNORE", "outside"
+    return "CLARIFY", "near"
 
 
-def _make_row(
-    spec: ScenarioSpec,
-    group_id: str,
-    profile_variant: str,
-    query_kind: str,
-    query: str,
-    history: str,
-) -> Dict[str, str]:
-    if profile_variant == "stable":
-        action = "APPLY"
-        zone = "inside"
-        profile_type = "trait_preference"
-        query_relation = "match" if query_kind == "shared" else ("mismatch" if query_kind == "crossing" else "unknown")
-        applies_when = "broadly across relevant situations"
-        not_when = "only when explicitly overridden by the user"
-        temporal_validity = "persistent"
-        owner = "user"
-    else:
-        action = {"shared": "APPLY", "crossing": "IGNORE", "uncertain": "CLARIFY"}[query_kind]
-        zone = {"shared": "inside", "crossing": "outside", "uncertain": "near"}[query_kind]
-        profile_type = spec.scoped_type
-        query_relation = {"shared": "match", "crossing": "mismatch", "uncertain": "unknown"}[query_kind]
-        applies_when = spec.applies_when
-        not_when = spec.not_when
-        temporal_validity = "temporary" if spec.scoped_type == "temporary_constraint" else "context-dependent"
-        owner = "other" if spec.scoped_type == "other_owner" else "user"
-
-    return {
-        "group_id": group_id,
-        "twin_pair_id": f"{group_id}:{query_kind}",
-        "family": spec.family,
-        "domain": spec.domain,
-        "profile_variant": profile_variant,
-        "profile_type": profile_type,
-        "preference_label": spec.preference_label,
-        "owner": owner,
-        "applies_when": applies_when,
-        "not_when": not_when,
-        "temporal_validity": temporal_validity,
-        "history": history,
-        "query": query,
-        "query_kind": query_kind,
-        "query_relation": query_relation,
-        "zone": zone,
-        "action": action,
-        "clarification_question": spec.clarification_question,
-        "apply_response": spec.apply_response,
-        "neutral_response": spec.neutral_response,
-    }
+def _query_pool(spec: ScenarioSpec, split: str, kind: str) -> Sequence[str]:
+    attr = f"{split}_{kind}_queries"
+    return getattr(spec, attr)
 
 
-def generate_frontier_suite(groups_per_family: int = 32, seed: int = 42) -> pd.DataFrame:
-    """Generate a controlled counterfactual evaluation suite.
+def generate_frontier_suite(
+    train_groups_per_family: int = 48,
+    test_groups_per_family: int = 16,
+    seed: int = 17,
+) -> pd.DataFrame:
+    """Generate controlled counterfactual twins with a strict group split.
 
-    Each group contains two histories with the same surface preference request:
-    one encodes a broad stable preference and the other a scoped/temporary cause.
-    The same three queries are asked against both histories.
+    Training groups only use train paraphrases; test groups only use held-out paraphrases.
+    Each group contains a stable and scoped history, each queried in inside/outside/near regimes.
     """
-    rng = random.Random(seed)
-    rows: List[Dict[str, str]] = []
+    rows: list[dict] = []
+    rng = Random(seed)
+    global_group = 0
+
     for spec in SPECS:
-        for idx in range(groups_per_family):
-            group_id = f"{spec.family}-{idx:03d}"
-            histories = {
-                "stable": _history(spec, "stable", rng),
-                "scoped": _history(spec, "scoped", rng),
-            }
-            queries = {
-                "shared": rng.choice(spec.shared_queries),
-                "crossing": rng.choice(spec.crossing_queries),
-                "uncertain": rng.choice(spec.uncertain_queries),
-            }
-            for variant in ("stable", "scoped"):
-                for query_kind, query in queries.items():
-                    rows.append(
-                        _make_row(
-                            spec=spec,
-                            group_id=group_id,
-                            profile_variant=variant,
-                            query_kind=query_kind,
-                            query=query,
-                            history=histories[variant],
+        for split, group_count in (("train", train_groups_per_family), ("test", test_groups_per_family)):
+            for local_group in range(group_count):
+                global_group += 1
+                group_id = f"{spec.family}-{split}-{local_group:03d}"
+                stable_history = _sample_history(spec, "stable", rng)
+                scoped_history = _sample_history(spec, "scoped", rng)
+                for query_kind in ("inside", "outside", "near"):
+                    query = rng.choice(tuple(_query_pool(spec, split, query_kind)))
+                    twin_pair_id = f"{group_id}-{query_kind}"
+                    for profile_variant, history in (
+                        ("stable", stable_history),
+                        ("scoped", scoped_history),
+                    ):
+                        action, zone = _gold_action(profile_variant, query_kind)
+                        information_type = (
+                            "trait_preference" if profile_variant == "stable" else spec.scoped_type
                         )
-                    )
+                        owner = "user" if profile_variant == "stable" else spec.owner
+                        temporal_validity = (
+                            "persistent"
+                            if profile_variant == "stable"
+                            else "context-dependent"
+                        )
+                        rows.append(
+                            {
+                                "example_id": f"{twin_pair_id}-{profile_variant}",
+                                "group_id": group_id,
+                                "twin_pair_id": twin_pair_id,
+                                "split": split,
+                                "family": spec.family,
+                                "domain": spec.domain,
+                                "profile_variant": profile_variant,
+                                "query_kind": query_kind,
+                                "zone": zone,
+                                "history": history,
+                                "query": query,
+                                "action": action,
+                                "preference_label": spec.preference_label,
+                                "owner": owner,
+                                "information_type": information_type,
+                                "temporal_validity": temporal_validity,
+                                "applies_when": (
+                                    "broadly across relevant situations"
+                                    if profile_variant == "stable"
+                                    else spec.applies_when
+                                ),
+                                "does_not_apply_when": (
+                                    "only when explicitly overridden or corrected"
+                                    if profile_variant == "stable"
+                                    else spec.does_not_apply_when
+                                ),
+                                "clarification_question": spec.clarification_question,
+                                "apply_response": spec.apply_response,
+                                "neutral_response": spec.neutral_response,
+                            }
+                        )
     df = pd.DataFrame(rows)
     return df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
 
-def save_frontier_suite(path: str, groups_per_family: int = 32, seed: int = 42) -> pd.DataFrame:
-    df = generate_frontier_suite(groups_per_family=groups_per_family, seed=seed)
+def save_frontier_suite(df: pd.DataFrame, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
-    return df
+    return path
+
+
+def scenario_catalog() -> list[dict]:
+    return [asdict(spec) for spec in SPECS]
+
+
+__all__ = [
+    "ScenarioSpec",
+    "SPECS",
+    "SPEC_BY_FAMILY",
+    "generate_frontier_suite",
+    "save_frontier_suite",
+    "scenario_catalog",
+]

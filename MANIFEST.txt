@@ -1,0 +1,12 @@
+FrontierMem Updated Prototype v0.2
+
+Validated locally:
+- Dataset generation: 4,608 examples
+- Classical baselines
+- Rule-based FrontierMem-Lite
+- Tiny Transformer checkpoint loading and inference
+- Hybrid learned-memory + rule-policy pipeline
+- 3 smoke tests passed
+
+Optional, requires internet/transformers:
+- Qwen/Qwen2.5-0.5B-Instruct end-to-end structured memory and response runner

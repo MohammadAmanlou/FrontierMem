@@ -1,16 +1,6 @@
-"""FrontierMem initial research prototype."""
+"""FrontierMem prototype package."""
 
-from .data import generate_frontier_suite
-from .memory import FrontierMemoryExtractor, FrontierPolicy
-from .baselines import FlatFactMemoryBaseline, RawHistoryClassifier
-from .evaluation import evaluate_predictions, evaluate_counterfactual_twins
+from .data import SPECS, SPEC_BY_FAMILY, generate_frontier_suite
+from .memory import RuleBasedFrontierMem
 
-__all__ = [
-    "generate_frontier_suite",
-    "FrontierMemoryExtractor",
-    "FrontierPolicy",
-    "FlatFactMemoryBaseline",
-    "RawHistoryClassifier",
-    "evaluate_predictions",
-    "evaluate_counterfactual_twins",
-]
+__all__ = ["SPECS", "SPEC_BY_FAMILY", "generate_frontier_suite", "RuleBasedFrontierMem"]
