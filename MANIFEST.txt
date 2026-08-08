@@ -1,12 +1,16 @@
-FrontierMem Updated Prototype v0.2
+FrontierMem Final Prototype Snapshot
 
-Validated locally:
-- Dataset generation: 4,608 examples
-- Classical baselines
-- Rule-based FrontierMem-Lite
-- Tiny Transformer checkpoint loading and inference
-- Hybrid learned-memory + rule-policy pipeline
-- 3 smoke tests passed
+Validated in this packaged snapshot:
+- Controlled dataset and local baselines
+- FrontierMem-Lite rule system
+- Tiny Transformer / hybrid artifacts
+- Robust Qwen backend and fast ablation runner
+- Qwen2.5-0.5B legacy results
+- Qwen2.5-1.5B four-mode 72-example ablations
+- Qwen2.5-3B 72-example gold-memory aggregate result
+- Cross-model comparison script and artifacts
+- Research concept report and 1.5B experiment report
+- Clean + raw Kaggle experiment notebooks
+- pytest smoke suite: 3 tests passed in packaging validation
 
-Optional, requires internet/transformers:
-- Qwen/Qwen2.5-0.5B-Instruct end-to-end structured memory and response runner
+See MANIFEST_FINAL.txt for the complete file list.

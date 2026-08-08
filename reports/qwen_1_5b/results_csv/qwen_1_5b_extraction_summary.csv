@@ -1,0 +1,6 @@
+metric,full_llm,llm_memory_rule
+family_correct,0.375,0.375
+information_type_correct,0.1111111111111111,0.1111111111111111
+owner_correct,0.0,0.0
+profile_variant_correct,0.9027777777777778,0.9027777777777778
+temporal_correct,0.8472222222222222,0.8472222222222222

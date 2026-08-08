@@ -1,0 +1,13 @@
+mode,label,gold_count,prediction_count
+gold_memory_llm,APPLY,24,48
+gold_memory_llm,IGNORE,24,7
+gold_memory_llm,CLARIFY,24,17
+rule_memory_llm,APPLY,24,42
+rule_memory_llm,IGNORE,24,8
+rule_memory_llm,CLARIFY,24,22
+llm_memory_rule,APPLY,24,25
+llm_memory_rule,IGNORE,24,12
+llm_memory_rule,CLARIFY,24,35
+full_llm,APPLY,24,0
+full_llm,IGNORE,24,72
+full_llm,CLARIFY,24,0

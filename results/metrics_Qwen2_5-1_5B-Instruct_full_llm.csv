@@ -1,0 +1,2 @@
+model,accuracy,balanced_accuracy,macro_f1,inside_accuracy,outside_accuracy,near_accuracy,overgeneralization_rate,unnecessary_clarification_rate,twin_exact_match,twin_discrimination_accuracy,different_gold_twin_pairs,n_examples
+Qwen2.5-1.5B-Instruct::full_llm,0.3333333333333333,0.3333333333333333,0.16666666666666666,0.0,1.0,0.0,0.0,0.0,0.0,0.0,3,72

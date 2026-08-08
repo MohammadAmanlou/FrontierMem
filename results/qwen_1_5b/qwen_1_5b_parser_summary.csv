@@ -1,0 +1,9 @@
+experiment,parser_stage,parse_mode,count
+gold_memory_llm,memory_parse_mode,gold,72
+gold_memory_llm,decision_parse_mode,llm_label,72
+rule_memory_llm,memory_parse_mode,rule,72
+rule_memory_llm,decision_parse_mode,llm_label,72
+llm_memory_rule,memory_parse_mode,json,72
+llm_memory_rule,decision_parse_mode,rule_policy,72
+full_llm,memory_parse_mode,json,72
+full_llm,decision_parse_mode,json,72

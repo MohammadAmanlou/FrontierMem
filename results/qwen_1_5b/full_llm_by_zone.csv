@@ -1,0 +1,4 @@
+zone,n,correct,accuracy
+inside,24,0,0.0
+near,24,0,0.0
+outside,24,24,1.0

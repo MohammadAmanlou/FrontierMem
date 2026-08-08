@@ -1,0 +1,7 @@
+model,mode,n_examples,dominant_prediction,dominant_prediction_count,dominant_prediction_share,possible_collapse
+Qwen2.5-0.5B-Instruct,legacy_full_llm,72,CLARIFY,72,1.0,True
+Qwen2.5-1.5B-Instruct,full_llm,72,IGNORE,72,1.0,True
+Qwen2.5-1.5B-Instruct,gold_memory_llm,72,APPLY,48,0.6666666666666666,False
+Qwen2.5-1.5B-Instruct,llm_memory_rule,72,CLARIFY,35,0.4861111111111111,False
+Qwen2.5-1.5B-Instruct,rule_memory_llm,72,APPLY,42,0.5833333333333334,False
+Qwen2.5-3B-Instruct,gold_memory_llm,72,CLARIFY,37,0.5138888888888888,False

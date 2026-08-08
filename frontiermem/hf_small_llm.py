@@ -173,7 +173,7 @@ def _extract_json(text: str) -> tuple[dict[str, Any], str]:
 
 @dataclass
 class HFGenerationConfig:
-    model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    model_name: str = "Qwen/Qwen2.5-1.5B-Instruct"
     max_new_tokens: int = 280
     temperature: float = 0.0
     torch_dtype: str = "auto"
@@ -188,11 +188,12 @@ class HFSmallLLMFrontierMem:
     uses an explicit rule fallback and records that fallback in the CSV.
     """
 
-    name = "Qwen2.5-0.5B-Instruct"
+    name = "Qwen2.5-1.5B-Instruct"
 
     def __init__(self, config: HFGenerationConfig | None = None, device_map: str = "auto") -> None:
         config = config or HFGenerationConfig()
         self.config = config
+        self.name = config.model_name.split("/")[-1]
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
         except ImportError as exc:
@@ -203,7 +204,7 @@ class HFSmallLLMFrontierMem:
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
-            torch_dtype=config.torch_dtype,
+            dtype=config.torch_dtype,
             device_map=device_map,
             attn_implementation=config.attn_implementation,
         )
@@ -251,12 +252,24 @@ class HFSmallLLMFrontierMem:
             "another person's preference."
         )
         user = f"""
-Read the interaction history and return exactly this JSON shape:
-{{"preference":"...","family":"...","profile_variant":"stable or scoped","owner":"...","information_type":"...","applies_when":"...","does_not_apply_when":"...","temporal_validity":"persistent or context-dependent","confidence":0.0,"evidence":["exact sentence"],"permission":"response_personalization"}}
+Read the interaction history and return exactly one JSON object with this shape:
+{{"preference":"","family":"","profile_variant":"","owner":"","information_type":"","applies_when":"","does_not_apply_when":"","temporal_validity":"","confidence":0.0,"evidence":[],"permission":"response_personalization"}}
 
 Allowed family values: {families}
+Allowed profile_variant values: stable, scoped. Choose exactly one.
+Allowed temporal_validity values: persistent, context-dependent. Choose exactly one.
+Use stable only when the preference generalizes across relevant contexts.
+Use scoped when the behavior is caused by a temporary state, goal, external constraint, role, audience, or local context.
 Evidence must contain at most three exact sentences copied from the history.
 Confidence must be a number from 0 to 1.
+
+Stable example:
+History: "I consistently prefer direct answers across tasks, even when I have extra time."
+Expected profile_variant: stable. Expected temporal_validity: persistent.
+
+Scoped example:
+History: "For this trip only, choose a cheap hotel because the university reimbursement cap is strict. This is not my general preference."
+Expected profile_variant: scoped. Expected information_type: temporary_constraint. Expected temporal_validity: context-dependent.
 
 HISTORY:
 {history}
@@ -332,14 +345,28 @@ HISTORY:
             "clearly does not, and CLARIFY only when a material missing fact prevents a safe decision."
         )
         user = f"""
+Decision rules:
+1. If profile_variant is stable, choose APPLY unless the current query explicitly overrides or corrects the preference.
+2. If profile_variant is scoped and the query satisfies applies_when, choose relation=match and action=APPLY.
+3. If profile_variant is scoped and the query satisfies does_not_apply_when, choose relation=mismatch and action=IGNORE.
+4. Choose relation=unknown and action=CLARIFY only when a material fact needed to distinguish APPLY from IGNORE is genuinely missing.
+5. Never choose CLARIFY merely because confidence is below 1.0.
+
+Examples:
+- scoped; applies_when=self-funded; does_not_apply_when=fully reimbursed; query=company pays fully -> action=IGNORE, relation=mismatch.
+- scoped; same boundary; query=I have not checked who pays -> action=CLARIFY, relation=unknown.
+- stable preference; query changes payment source but does not override the preference -> action=APPLY, relation=match.
+
 MEMORY:
 {memory.to_json()}
 
 CURRENT QUERY:
 {query}
 
-Return exactly this JSON shape:
-{{"action":"APPLY or IGNORE or CLARIFY","relation":"match or mismatch or unknown","confidence":0.0,"response":"final response or one minimal clarification question","reason":"one short scope-grounded sentence"}}
+Return exactly one JSON object with this shape:
+{{"action":"","relation":"","confidence":0.0,"response":"","reason":""}}
+Allowed action values: APPLY, IGNORE, CLARIFY. Choose exactly one.
+Allowed relation values: match, mismatch, unknown. Choose exactly one.
 """.strip()
         raw = self._chat(system, user)
         try:
@@ -396,8 +423,12 @@ Return exactly this JSON shape:
         outputs: list[dict[str, Any]] = []
         total = len(work)
         for index, row in enumerate(work.itertuples(), start=1):
-            print(f"[{index}/{total}] Running Qwen on {row.family} / {row.action}", flush=True)
-            outputs.append(self.predict_one(row.history, row.query))
+            result = self.predict_one(row.history, row.query)
+            outputs.append(result)
+            print(
+                f"[{index}/{total}] family={row.family} | gold={row.action} | prediction={result['action']}",
+                flush=True,
+            )
 
         work["prediction"] = [x["action"] for x in outputs]
         work["pred_relation"] = [x["relation"] for x in outputs]
