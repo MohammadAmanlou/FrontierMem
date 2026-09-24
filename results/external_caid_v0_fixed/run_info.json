@@ -1,0 +1,18 @@
+{
+  "n_train": 6884,
+  "n_calibration": 1683,
+  "alpha": 0.1,
+  "mode": "full",
+  "qhat": 0.8531386574176915,
+  "sources_evaluated": {
+    "rpeval_explicit": 953,
+    "rpeval_implicit": 953,
+    "benchpres": 1950
+  },
+  "contrast_metrics": {
+    "n_pairs": 11126,
+    "direction_accuracy": 0.8735394571274492,
+    "mean_margin": 0.5977313197369136,
+    "median_margin": 0.7462614598016193
+  }
+}

@@ -1,0 +1,4 @@
+source,mode,alpha,forced_accuracy,forced_macro_f1,forced_n,selective_coverage,selective_clarification_rate,selective_selective_accuracy,selective_overall_binary_correct_or_abstain,selective_appropriate_application_rate,selective_misapplication_rate,selective_n
+benchpres,query_only,0.1,0.34,0.2537313432835821,1950,0.0,1.0,,1.0,0.0,0.0,1950.0
+rpeval_explicit,query_only,0.1,0.291710388247639,0.2623915129874821,953,0.1825813221406086,0.8174186778593914,0.3390804597701149,0.8793284365162645,0.14885496183206107,0.15918958031837915,953.0
+rpeval_implicit,query_only,0.1,0.291710388247639,0.2623915129874821,953,0.1825813221406086,0.8174186778593914,0.3390804597701149,0.8793284365162645,0.14885496183206107,0.15918958031837915,953.0

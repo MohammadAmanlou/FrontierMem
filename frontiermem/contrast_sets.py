@@ -115,7 +115,7 @@ def build_query_preference_contrast_pairs(
     multiple contexts.
     """
     if allowed_usage is None:
-        allowed_usage = {"train_pool", "train", "calibration", "dev"}
+        allowed_usage = {"train_pool", "train", "calibration", "dev", "eval", "eval_only"}
 
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:

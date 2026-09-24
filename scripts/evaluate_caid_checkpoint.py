@@ -15,19 +15,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from frontiermem.external_data import load_jsonl, normalize_rpeval_native_label
+from frontiermem.contrast_sets import load_pairs
 from frontiermem.identifiability import SplitConformalAbstainer, selective_metrics
 
 LABELS = ["IGNORE", "SUPPORT", "DOMINATE"]
 
 
 def format_row(row: dict) -> str:
-    return (
-        f"[PREFERENCE]\n{row.get('preference', '')}\n"
-        f"[HISTORY]\n{row.get('history', '')}\n"
-        f"[CONTEXT]\n{row.get('context', '')}\n"
-        f"[QUERY]\n{row.get('query', '')}\n"
-        "[QUESTION]\nHow strongly should this preference influence the response?"
-    )
+    parts = [f"[PREFERENCE]\n{row.get('preference', '')}"]
+    history = str(row.get("history", ""))
+    context = str(row.get("context", ""))
+    if history.strip():
+        parts.append(f"[HISTORY]\n{history}")
+    if context.strip():
+        parts.append(f"[CONTEXT]\n{context}")
+    parts.append(f"[QUERY]\n{row.get('query', '')}")
+    parts.append("[QUESTION]\nHow strongly should this preference influence the response?")
+    return "\n".join(parts)
 
 
 def logits_rows(model, tokenizer, rows, device, batch_size, max_length):
@@ -96,6 +100,7 @@ def main():
         default="data/external_processed/all_applicability_examples.jsonl",
     )
     parser.add_argument("--output-dir", default="results/caid_checkpoint_eval")
+    parser.add_argument("--pairs", default="data/external_processed/query_preference_contrast_pairs.jsonl")
     parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--max-length", type=int, default=1024)
@@ -118,6 +123,10 @@ def main():
         torch.float16 if torch.cuda.is_available() else torch.float32
     )
     model = load_model(args.checkpoint, dtype)
+    # Qwen sequence classification needs pad_token_id for batched padded inference.
+    model.config.pad_token_id = tokenizer.pad_token_id
+    if hasattr(model, "base_model") and hasattr(model.base_model, "config"):
+        model.base_model.config.pad_token_id = tokenizer.pad_token_id
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
@@ -183,9 +192,65 @@ def main():
                 }
             )
 
+
+    # Pair-direction evaluation. Report each benchmark separately; do not hide
+    # cross-benchmark collapse inside one pooled number.
+    pair_path = Path(args.pairs)
+    pair_metric_rows = []
+    if pair_path.exists():
+        pairs = load_pairs(pair_path)
+
+        def pair_side_rows(part):
+            pos, neg = [], []
+            for p in part:
+                pos.append({
+                    "preference": p.get("positive_preference", ""),
+                    "history": p.get("positive_history", ""),
+                    "context": p.get("positive_context", ""),
+                    "query": p.get("positive_query", ""),
+                })
+                neg.append({
+                    "preference": p.get("negative_preference", ""),
+                    "history": p.get("negative_history", ""),
+                    "context": p.get("negative_context", ""),
+                    "query": p.get("negative_query", ""),
+                })
+            return pos, neg
+
+        for usage in sorted({str(p.get("usage", "")) for p in pairs}):
+            usage_rows = [p for p in pairs if str(p.get("usage", "")) == usage]
+            for source in sorted({str(p.get("source", "")) for p in usage_rows}):
+                part = [p for p in usage_rows if str(p.get("source", "")) == source]
+                if not part:
+                    continue
+                pos_rows, neg_rows = pair_side_rows(part)
+                lp = logits_rows(model, tokenizer, pos_rows, device, args.batch_size, args.max_length)
+                ln = logits_rows(model, tokenizer, neg_rows, device, args.batch_size, args.max_length)
+                # s(x)=logsumexp(SUPPORT,DOMINATE)-IGNORE
+                def app_score_np(z):
+                    m = np.maximum(z[:, 1], z[:, 2])
+                    lse = m + np.log(np.exp(z[:, 1] - m) + np.exp(z[:, 2] - m))
+                    return lse - z[:, 0]
+                margin = app_score_np(lp) - app_score_np(ln)
+                pair_metric_rows.append({
+                    "usage": usage,
+                    "source": source,
+                    "n_pairs": len(part),
+                    "direction_accuracy": float((margin > 0).mean()),
+                    "mean_margin": float(margin.mean()),
+                    "median_margin": float(np.median(margin)),
+                })
+
+        pd.DataFrame(pair_metric_rows).to_csv(
+            out / "pair_metrics_by_split_source.csv", index=False
+        )
+
     pd.DataFrame(metric_rows).to_csv(out / "metrics.csv", index=False)
     pd.DataFrame(pred_rows).to_csv(out / "predictions.csv", index=False)
     print(pd.DataFrame(metric_rows).to_string(index=False))
+    if pair_metric_rows:
+        print("\nPair-direction metrics by split/source:")
+        print(pd.DataFrame(pair_metric_rows).to_string(index=False))
     print(f"\nSaved to {out}")
 
 

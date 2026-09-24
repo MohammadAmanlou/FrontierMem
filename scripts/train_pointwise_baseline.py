@@ -24,13 +24,34 @@ def load_jsonl(path):
 
 
 def format_side(side: dict) -> str:
-    return (
-        f"[PREFERENCE]\n{side.get('preference', '')}\n"
-        f"[HISTORY]\n{side.get('history', '')}\n"
-        f"[CONTEXT]\n{side.get('context', '')}\n"
-        f"[QUERY]\n{side.get('query', '')}\n"
-        "[QUESTION]\nHow strongly should this preference influence the response?"
-    )
+    parts = [f"[PREFERENCE]\n{side.get('preference', '')}"]
+    history = str(side.get("history", ""))
+    context = str(side.get("context", ""))
+    if history.strip():
+        parts.append(f"[HISTORY]\n{history}")
+    if context.strip():
+        parts.append(f"[CONTEXT]\n{context}")
+    parts.append(f"[QUERY]\n{side.get('query', '')}")
+    parts.append("[QUESTION]\nHow strongly should this preference influence the response?")
+    return "\n".join(parts)
+
+
+def group_safe_pair_split(pairs, dev_fraction: float, seed: int):
+    groups = sorted({str(p.get("group_id", "")) for p in pairs})
+    if not groups or "" in groups:
+        raise SystemExit(
+            "Pair file is missing group_id. Re-run export_pairwise_training_data.py "
+            "after applying the v2.4 patch."
+        )
+    rng = random.Random(seed)
+    rng.shuffle(groups)
+    dev_g_n = max(1, int(round(dev_fraction * len(groups))))
+    dev_groups = set(groups[:dev_g_n])
+    train_pairs = [p for p in pairs if str(p["group_id"]) not in dev_groups]
+    dev_pairs = [p for p in pairs if str(p["group_id"]) in dev_groups]
+    if {p["group_id"] for p in train_pairs} & {p["group_id"] for p in dev_pairs}:
+        raise RuntimeError("Group leakage detected in train/dev pair split")
+    return train_pairs, dev_pairs
 
 
 class FlatPairDataset(Dataset):
@@ -101,6 +122,7 @@ def main():
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max-length", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--dev-fraction", type=float, default=0.10)
     parser.add_argument("--lora", action="store_true")
     args = parser.parse_args()
 
@@ -114,9 +136,16 @@ def main():
     pairs = load_jsonl(args.pairs)
     if len(pairs) < 2:
         raise SystemExit("Need at least two pair records.")
-    random.shuffle(pairs)
-    dev_n = max(1, int(0.1 * len(pairs)))
-    dev_pairs, train_pairs = pairs[:dev_n], pairs[dev_n:]
+    train_pairs, dev_pairs = group_safe_pair_split(
+        pairs, args.dev_fraction, args.seed
+    )
+    print(json.dumps({
+        "pair_split": "group_safe",
+        "train_pairs": len(train_pairs),
+        "dev_pairs": len(dev_pairs),
+        "train_groups": len({p["group_id"] for p in train_pairs}),
+        "dev_groups": len({p["group_id"] for p in dev_pairs}),
+    }, indent=2))
 
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     if tokenizer.pad_token is None:

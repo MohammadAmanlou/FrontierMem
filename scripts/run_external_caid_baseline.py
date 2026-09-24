@@ -180,10 +180,33 @@ def main() -> None:
 
     flip_path = Path(args.flip_pairs)
     flip_pairs = load_pairs(flip_path) if flip_path.exists() else []
-    eval_pairs = [p for p in flip_pairs if p.get("usage") != "train_pool"]
-    pair_metrics = evaluate_contrast_pairs(model, eval_pairs)
-    (out / "contrast_metrics.json").write_text(
-        json.dumps(pair_metrics, indent=2), encoding="utf-8"
+
+    # Report contrast metrics separately by usage and source. Never headline a
+    # mixture containing training pairs.
+    contrast_rows = []
+    usages = sorted({str(p.get("usage", "")) for p in flip_pairs})
+    for usage in usages:
+        usage_pairs = [p for p in flip_pairs if str(p.get("usage", "")) == usage]
+        sources = sorted({str(p.get("source", "")) for p in usage_pairs})
+        for source in sources:
+            part = [p for p in usage_pairs if str(p.get("source", "")) == source]
+            m = evaluate_contrast_pairs(model, part)
+            contrast_rows.append(
+                {"usage": usage, "source": source, **m}
+            )
+
+    # Clean held-out aggregate used for reporting.
+    heldout_pairs = [
+        p for p in flip_pairs
+        if str(p.get("usage", "")) in {"eval", "eval_only"}
+    ]
+    heldout_metrics = evaluate_contrast_pairs(model, heldout_pairs)
+
+    pd.DataFrame(contrast_rows).to_csv(
+        out / "contrast_metrics_by_split_source.csv", index=False
+    )
+    (out / "contrast_metrics_heldout.json").write_text(
+        json.dumps(heldout_metrics, indent=2), encoding="utf-8"
     )
 
     with (out / "model.pkl").open("wb") as f:
@@ -196,15 +219,20 @@ def main() -> None:
         "mode": args.mode,
         "qhat": model.conformal.qhat if model.conformal else None,
         "sources_evaluated": {k: len(v) for k, v in source_groups.items()},
-        "contrast_metrics": pair_metrics,
+        "heldout_contrast_metrics": heldout_metrics,
     }
     (out / "run_info.json").write_text(
         json.dumps(run_info, indent=2), encoding="utf-8"
     )
 
     print(pd.DataFrame(metric_rows).to_string(index=False))
-    print("\nContrast metrics:")
-    print(json.dumps(pair_metrics, indent=2))
+    print("\nContrast metrics by split/source:")
+    if contrast_rows:
+        print(pd.DataFrame(contrast_rows).to_string(index=False))
+    else:
+        print("(no contrast pairs)")
+    print("\nHELD-OUT contrast metrics only:")
+    print(json.dumps(heldout_metrics, indent=2))
     print(f"\nSaved to {out}")
 
 

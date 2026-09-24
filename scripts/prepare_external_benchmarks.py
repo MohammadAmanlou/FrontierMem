@@ -152,6 +152,39 @@ def main() -> None:
             "n_invariance_pairs": len(invariance_pairs),
         }
     )
+
+    # Upstream RPEval README (current release) reports:
+    # generation pool = 8,567 atomic annotations;
+    # explicit eval = 953; implicit eval = 953.
+    # Keep these as diagnostics rather than silently accepting adapter loss.
+    source_counts = Counter(r["source"] for r in all_examples)
+    expected = {
+        "rpeval_generation": 8567,
+        "rpeval_explicit": 953,
+        "rpeval_implicit": 953,
+    }
+    summary["rpeval_release_count_check"] = {
+        source: {
+            "observed": int(source_counts.get(source, 0)),
+            "expected_upstream": expected_count,
+            "match": int(source_counts.get(source, 0)) == expected_count,
+        }
+        for source, expected_count in expected.items()
+    }
+
+    if source_counts.get("rpeval_generation", 0) == 0:
+        print(
+            "[WARN] RPEval generation pool produced zero atomic examples. "
+            "Check data_generation/data.json and the adapter."
+        )
+    for source, expected_count in expected.items():
+        observed = int(source_counts.get(source, 0))
+        if observed and observed != expected_count:
+            print(
+                f"[WARN] {source}: observed {observed} atomic rows, "
+                f"upstream README reports {expected_count}. "
+                "Inspect before reporting benchmark results."
+            )
     (out / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
         encoding="utf-8",

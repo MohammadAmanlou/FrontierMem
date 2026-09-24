@@ -24,12 +24,13 @@ def format_example(row: dict, mode: str = "full") -> str:
     if mode == "preference_query":
         return f"[PREFERENCE]\n{pref}\n[QUERY]\n{query}"
     if mode == "full":
-        return (
-            f"[PREFERENCE]\n{pref}\n"
-            f"[HISTORY]\n{history}\n"
-            f"[CONTEXT]\n{context}\n"
-            f"[QUERY]\n{query}"
-        )
+        parts = [f"[PREFERENCE]\n{pref}"]
+        if history.strip():
+            parts.append(f"[HISTORY]\n{history}")
+        if context.strip():
+            parts.append(f"[CONTEXT]\n{context}")
+        parts.append(f"[QUERY]\n{query}")
+        return "\n".join(parts)
     raise ValueError(f"Unknown text mode: {mode}")
 
 

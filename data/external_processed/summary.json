@@ -1,0 +1,57 @@
+{
+  "n_atomic_examples": 12423,
+  "by_source": {
+    "rpeval_explicit": 953,
+    "rpeval_implicit": 953,
+    "rpeval_generation": 8567,
+    "benchpres": 1950
+  },
+  "by_usage": {
+    "eval": 1906,
+    "train": 6884,
+    "calibration": 1683,
+    "eval_only": 1950
+  },
+  "by_action": {
+    "APPLY": 5424,
+    "IGNORE": 6999
+  },
+  "by_source_action": {
+    "benchpres": {
+      "APPLY": 663,
+      "IGNORE": 1287
+    },
+    "rpeval_explicit": {
+      "APPLY": 262,
+      "IGNORE": 691
+    },
+    "rpeval_generation": {
+      "IGNORE": 4330,
+      "APPLY": 4237
+    },
+    "rpeval_implicit": {
+      "IGNORE": 691,
+      "APPLY": 262
+    }
+  },
+  "n_context_decision_flip_pairs": 0,
+  "n_query_preference_contrast_pairs": 11126,
+  "n_invariance_pairs": 684,
+  "rpeval_release_count_check": {
+    "rpeval_generation": {
+      "observed": 8567,
+      "expected_upstream": 8567,
+      "match": true
+    },
+    "rpeval_explicit": {
+      "observed": 953,
+      "expected_upstream": 953,
+      "match": true
+    },
+    "rpeval_implicit": {
+      "observed": 953,
+      "expected_upstream": 953,
+      "match": true
+    }
+  }
+}

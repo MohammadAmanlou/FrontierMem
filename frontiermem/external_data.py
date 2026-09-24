@@ -161,6 +161,8 @@ def normalize_rpeval_native_label(label: Any) -> str:
         "b": "SUPPORT",
         "support": "SUPPORT",
         "supportive": "SUPPORT",
+        "支持性偏好": "SUPPORT",
+        "支支持持性性偏偏好好": "SUPPORT",
         "c": "DOMINATE",
         "dominate": "DOMINATE",
         "dominant": "DOMINATE",
@@ -230,15 +232,25 @@ def adapt_rpeval_records(
             except ValueError:
                 continue
 
-            history = ""
+            implicit_memory = ""
             if implicit_list:
-                history = normalize_text(_pick_index(implicit_list, idx, ""))
-            use_implicit = bool(history) if implicit is None else implicit
-            preference = normalize_text(pref)
+                implicit_memory = normalize_text(_pick_index(implicit_list, idx, ""))
+            use_implicit = bool(implicit_memory) if implicit is None else implicit
+
+            canonical_preference = normalize_text(pref)
+            if use_implicit:
+                if not implicit_memory:
+                    raise ValueError(
+                        f"RPEval implicit record {row_idx}, atomic index {idx} "
+                        "has no implicit_persona text"
+                    )
+                observed_memory = implicit_memory
+            else:
+                observed_memory = canonical_preference
 
             record_id = row.get("id", row.get("qid", row_idx))
             ex_id = stable_hash(
-                "rpeval", source_split, record_id, idx, question, preference,
+                "rpeval", source_split, record_id, idx, question, canonical_preference,
                 prefix="rpeval-",
             )
             reason = normalize_text(_pick_index(reasons, idx, reasons[0] if reasons else ""))
@@ -249,10 +261,15 @@ def adapt_rpeval_records(
                     source="rpeval_implicit" if use_implicit else "rpeval_explicit",
                     source_split=source_split,
                     usage=usage,
-                    preference=preference,
-                    history=history,
+                    # IMPORTANT: expose only the memory representation allowed by
+                    # the official benchmark protocol. For implicit evaluation,
+                    # the explicit persona is metadata only.
+                    preference=observed_memory,
+                    history="",
                     query=question,
-                    context=reason,
+                    # `reason` is gold explanatory metadata in RPEval and must
+                    # never be fed to the predictor.
+                    context="",
                     action=action,
                     source_label=normalize_text(label),
                     group_id=stable_hash(
@@ -262,6 +279,9 @@ def adapt_rpeval_records(
                     metadata={
                         "atomic_index": idx,
                         "reason": reason,
+                        "canonical_preference": canonical_preference,
+                        "implicit_memory": implicit_memory,
+                        "memory_setting": "implicit" if use_implicit else "explicit",
                         "original_record_id": record_id,
                         "num_preferences": len(personas),
                         "native_label": normalize_rpeval_native_label(label),
@@ -270,6 +290,97 @@ def adapt_rpeval_records(
             )
     return output
 
+
+
+def adapt_rpeval_generation_pool(
+    records: Sequence[dict[str, Any]],
+    *,
+    usage: str = "train_pool",
+) -> list[ApplicabilityExample]:
+    """Normalize the released RPEval data-generation pool.
+
+    Upstream schema (documented in RPEval croissant.json):
+      {
+        "question": str,
+        "ignore": [preference, ...],
+        "supportive": [preference, ...],
+        "dominant": [preference, ...]
+      }
+
+    Each preference becomes one atomic applicability example. The original
+    three-way label is preserved in `source_label` / metadata.native_label,
+    while binary applicability is:
+      IGNORE -> IGNORE
+      SUPPORT / DOMINATE -> APPLY
+
+    This adapter intentionally does not generate or rewrite any text.
+    """
+    output: list[ApplicabilityExample] = []
+    buckets = (
+        ("ignore", "IGNORE", "IGNORE"),
+        ("supportive", "SUPPORT", "APPLY"),
+        ("dominant", "DOMINATE", "APPLY"),
+    )
+
+    for row_idx, row in enumerate(records):
+        question = normalize_text(row.get("question") or row.get("query"))
+        if not question:
+            raise ValueError(
+                f"RPEval generation row {row_idx} has no question/query field"
+            )
+
+        record_id = row.get("id", row.get("qid", row_idx))
+        group_id = stable_hash(
+            "rpeval_generation",
+            record_id,
+            question,
+            prefix="rpeval-generation-g-",
+        )
+
+        atomic_idx = 0
+        for field_name, native_label, action in buckets:
+            prefs = row.get(field_name, [])
+            if prefs is None:
+                prefs = []
+            if not isinstance(prefs, (list, tuple)):
+                prefs = [prefs]
+
+            for pref_idx, pref in enumerate(prefs):
+                preference = normalize_text(pref)
+                if not preference:
+                    continue
+
+                output.append(
+                    ApplicabilityExample(
+                        example_id=stable_hash(
+                            "rpeval_generation",
+                            record_id,
+                            field_name,
+                            pref_idx,
+                            question,
+                            preference,
+                            prefix="rpeval-generation-",
+                        ),
+                        source="rpeval_generation",
+                        source_split="generation_pool",
+                        usage=usage,
+                        preference=preference,
+                        query=question,
+                        action=action,
+                        source_label=native_label,
+                        group_id=group_id,
+                        language="zh",
+                        metadata={
+                            "original_record_id": record_id,
+                            "atomic_index": atomic_idx,
+                            "bucket": field_name,
+                            "native_label": native_label,
+                        },
+                    )
+                )
+                atomic_idx += 1
+
+    return output
 
 def adapt_benchpres_rows(rows: Sequence[dict[str, Any]]) -> list[ApplicabilityExample]:
     """Explode BenchPreS rows into atomic preference-context decisions.
@@ -423,11 +534,9 @@ def load_rpeval_directory(root: str | Path) -> list[ApplicabilityExample]:
         generation = []
     if generation:
         examples.extend(
-            adapt_rpeval_records(
+            adapt_rpeval_generation_pool(
                 generation,
-                source_split="generation_pool",
                 usage="train_pool",
-                implicit=None,
             )
         )
     return examples
@@ -461,6 +570,7 @@ __all__ = [
     "ApplicabilityExample",
     "DATASET_REGISTRY",
     "adapt_benchpres_rows",
+    "adapt_rpeval_generation_pool",
     "adapt_rpeval_records",
     "download_rpeval_public",
     "load_benchpres_hf",

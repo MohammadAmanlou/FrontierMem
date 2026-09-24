@@ -76,7 +76,9 @@ def main() -> None:
                     "pair_id": p["pair_id"],
                     "pair_type": p.get("pair_type", "unknown"),
                     "source": p["source"],
+                    "group_id": p.get("group_id", ""),
                     "positive": {
+                        "example_id": p.get("positive_example_id", ""),
                         "preference": p.get("positive_preference", ""),
                         "query": p["positive_query"],
                         "history": p.get("positive_history", ""),
@@ -85,6 +87,7 @@ def main() -> None:
                         "native_label": pos_native,
                     },
                     "negative": {
+                        "example_id": p.get("negative_example_id", ""),
                         "preference": p.get("negative_preference", ""),
                         "query": p["negative_query"],
                         "history": p.get("negative_history", ""),
