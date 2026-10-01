@@ -1,6 +1,6 @@
-\documentclass[10pt,twocolumn]{article}
+\documentclass[11pt]{article}
 
-\usepackage[margin=0.72in,columnsep=0.24in]{geometry}
+\usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{microtype}
@@ -33,10 +33,6 @@
 \begin{document}
 \maketitle
 \vspace{-1.2em}
-
-\begin{abstract}
-Long-term memory allows language-model assistants to retain user preferences across interactions, but remembering a preference does not determine whether that preference should influence every future query. Recent work shows complementary failures: irrelevant memories can interfere with intent reasoning, preferences can be over-applied outside their valid context, and personal memory can remain genuinely ambiguous when context, time, or source information is missing. We study this gap as \emph{preference applicability}: given a stored preference and a new query, should the preference influence the response, be ignored, or trigger clarification? We present FrontierMem, a preference-centric memory framework, and CAID (\emph{Contextual Applicability Identification and Disambiguation}), a learning formulation that treats applicability as a query-specific decision. FrontierMem stores atomic preferences together with evidence, scope, temporal validity, and conflict state; CAID then learns a preference--query applicability boundary using native benchmark supervision and same-query positive/negative preference-use contrasts. This draft focuses on the problem formulation and method; the matched Pointwise-versus-CAID experiments are ongoing.
-\end{abstract}
 
 \section{Introduction}
 
