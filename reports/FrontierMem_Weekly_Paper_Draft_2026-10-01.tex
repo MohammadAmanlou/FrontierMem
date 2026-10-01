@@ -1,0 +1,394 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[margin=0.72in,columnsep=0.24in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+
+\definecolor{linkblue}{RGB}{38,88,150}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=linkblue,
+  citecolor=linkblue,
+  urlcolor=linkblue
+}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+\setlist[itemize]{leftmargin=1.2em,itemsep=1pt,topsep=3pt}
+\renewcommand{\arraystretch}{1.08}
+
+\title{\vspace{-1.3em}\textbf{When Does a Preference Apply?}\\
+\large Applicability-Aware Memory for Long-Term LLM Personalization}
+\author{FrontierMem --- Working Paper Draft}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+\vspace{-1.2em}
+
+\begin{abstract}
+Long-term memory allows language-model assistants to retain user preferences across interactions, but remembering a preference does not determine whether that preference should influence every future query. Recent work shows complementary failures: irrelevant memories can interfere with intent reasoning, preferences can be over-applied outside their valid context, and personal memory can remain genuinely ambiguous when context, time, or source information is missing. We study this gap as \emph{preference applicability}: given a stored preference and a new query, should the preference influence the response, be ignored, or trigger clarification? We present FrontierMem, a preference-centric memory framework, and CAID (\emph{Contextual Applicability Identification and Disambiguation}), a learning formulation that treats applicability as a query-specific decision. FrontierMem stores atomic preferences together with evidence, scope, temporal validity, and conflict state; CAID then learns a preference--query applicability boundary using native benchmark supervision and same-query positive/negative preference-use contrasts. This draft focuses on the problem formulation and method; the matched Pointwise-versus-CAID experiments are ongoing.
+\end{abstract}
+
+\section{Introduction}
+
+Large language models are increasingly used as persistent assistants rather than isolated question-answering systems. A useful long-term assistant must remember information that may have been expressed many interactions earlier, including preferences, constraints, goals, and recurring user-specific patterns. This has motivated memory architectures that extend beyond the immediate context window. MemoryBank introduced long-term conversational memory with explicit updating and forgetting mechanisms \cite{zhong2024memorybank}; MemGPT framed long-context interaction as hierarchical memory management \cite{packer2023memgpt}; LongMemEval later showed that extraction, multi-session reasoning, temporal reasoning, updating, and abstention remain difficult even for strong chat assistants \cite{wu2025longmemeval}. More recent personalization benchmarks and systems further emphasize structured, compact, and dynamically maintained user memory \cite{jiang2025personamemv2,zhao2026insideout,hou2026personatree,wang2026qumem}.
+
+However, \textbf{remembering a preference is not the same as knowing when to use it}. Consider a user who says, ``When I am debugging code, I prefer short explanations.'' A memory system may correctly store this preference. Later, the user asks for a detailed explanation of a mathematical proof. The remembered preference is still a valid statement about the user, and it may even be semantically related to the new request because both involve explanations. Yet the original evidence only supports concise explanations in a debugging context. Applying the preference globally would turn a correct memory into incorrect personalization. This motivates a separation between three questions:
+\begin{itemize}
+    \item \emph{Memory construction:} what user information should be stored?
+    \item \emph{Retrieval:} which stored memories are candidates for the current query?
+    \item \emph{Applicability:} which retrieved preferences are justified to influence this query?
+\end{itemize}
+
+Recent benchmarks show that this third question is not solved by memory retrieval alone. RPEval studies rational preference utilization and reports that irrelevant personalized memories can interfere with intent understanding; its RP-Reasoner therefore treats memory use as a selective reasoning problem \cite{feng2026rpeval}. BenchPreS directly evaluates whether persistent preferences should be applied or suppressed across communication contexts, and finds that stronger preference adherence can coexist with higher over-application \cite{yoon2026benchpres}. MemSyco-Bench makes the same distinction from a decision-authority perspective: its tasks test whether memory should influence a decision, whether applicable scope is respected, how conflicts are handled, and whether valid memories are used appropriately \cite{xiang2026memsyco}. These works establish a central failure mode for persistent personalization: \emph{a system can remember the right information and still use it in the wrong situation}.
+
+The difficulty is amplified because user preferences are not always static global traits. S2Pref distinguishes stable, context-agnostic preferences from situational, context-dependent preferences, and explicitly evaluates contextual reasoning and ambiguity resolution \cite{gao2026s2pref}. PAMU studies preference evolution and motivates updating memory as short- and long-term tendencies change \cite{sun2026pamu}. RealPref evaluates long-horizon preference following under explicit and implicit preference expression and reports additional difficulty under longer histories and unseen scenarios \cite{guo2026realpref}. PersonaMem-v2 similarly focuses on implicit preferences distributed through long contexts, where reasoning rather than context length alone remains a bottleneck \cite{jiang2025personamemv2}. Thus, a flat statement such as ``the user prefers $X$'' is often incomplete: the useful representation must preserve what evidence supports the preference, under which conditions it applies, and whether its validity changes with time or context.
+
+Recent memory systems move in this direction. PersonaTree represents person understanding through a structured lifecycle memory with explicit evidence-to-claim support paths, confidence-guided consolidation, and query-conditioned retrieval \cite{hou2026personatree}. Inside Out maintains an evolving user-centric memory tree with explicit ADD, UPDATE, DELETE, and NO\_OP operations \cite{zhao2026insideout}. QUMem decomposes interaction histories into typed memories while preserving temporal positions and source evidence, then performs query-conditioned inference of a temporally and contextually valid user state \cite{wang2026qumem}. AlpsBench, built from real human--LLM dialogues, evaluates the full memory lifecycle---extraction, updating, retrieval, and utilization---and shows that explicit memory mechanisms do not automatically guarantee preference-aligned responses \cite{xiao2026alpsbench}. These results motivate structured memory, but they also sharpen our question: \emph{after a preference has been represented and retrieved, what evidence justifies transferring it to this particular query?}
+
+A second challenge appears when the history does not uniquely determine the scope of a preference. The same observation may be compatible with multiple latent explanations: a behavior may reflect a stable preference, a temporary constraint, or a goal specific to one situation. TANGLE studies closely related underdetermination in personal memory, showing that context, behavioral change, and source disagreement can produce conflicts for which forcing one memory as definitive is unjustified; it therefore evaluates confidence calibration and clarification seeking in addition to conflict recognition \cite{yang2026tangle}. This connects to the broader idea of partial identifiability: in inverse reinforcement learning, multiple latent reward functions can be compatible with the same observed behavior, while a downstream application may still be well-defined if all plausible latent explanations induce the same relevant decision \cite{skalse2026partial}. We adopt this intuition at the level of preference use: full identification of the user's latent state is not always necessary; what matters is whether the \emph{query-specific applicability decision} is resolved.
+
+We therefore study \textbf{preference applicability}: given the available evidence for a stored preference $p$ and a current query $q$, should $p$ be allowed to influence the response? We introduce \textbf{FrontierMem}, an applicability-aware preference memory framework, and \textbf{CAID} (\emph{Contextual Applicability Identification and Disambiguation}), a learning formulation for this decision. FrontierMem represents preferences as atomic, evidence-grounded objects with explicit positive and negative applicability conditions, temporal validity, confidence, and conflict state. Retrieval is used only to produce candidate memories; it is not treated as proof that a preference applies. CAID then evaluates each candidate preference in relation to the query.
+
+Our contribution is intentionally narrower than claiming that structured memory, context-aware preferences, temporal updating, or clarification are individually new. Prior work already studies these components \cite{gao2026s2pref,sun2026pamu,hou2026personatree,wang2026qumem,yang2026tangle}. Instead, our current formulation focuses on three connected ideas:
+\begin{itemize}
+    \item representing \emph{applicability boundaries} as a first-class part of preference memory;
+    \item learning a query-specific applicability boundary from benchmark-native positive/negative preference-use contrasts while preserving the benchmark's native labels; and
+    \item linking unresolved applicability to a selective \textsc{Clarify} action through a decision-identifiability view, rather than forcing personalization.
+\end{itemize}
+To the best of our targeted review through October 2026, we did not find prior work that combines these three elements in this exact formulation. We therefore treat this combination---rather than the individual memory fields---as the central research hypothesis to test.
+
+\section{Approach}
+
+\subsection{Overview}
+
+FrontierMem separates \emph{building memory} from \emph{deciding whether to use memory}. The complete conceptual pipeline is:
+\[
+H
+\longrightarrow
+\mathcal{M}(H)
+\longrightarrow
+\mathcal{M}_q
+\longrightarrow
+d(p,q)
+\longrightarrow
+\text{response},
+\]
+where $H$ is the user history, $\mathcal{M}(H)$ is the structured memory store, $\mathcal{M}_q$ is a small set of candidate memories retrieved for query $q$, and
+\[
+d(p,q)\in\{\textsc{Apply},\textsc{Ignore},\textsc{Clarify}\}.
+\]
+Each stage has one responsibility. Extraction determines \emph{what the memory says}; retrieval determines \emph{what is worth checking}; applicability determines \emph{what is allowed to influence the answer}.
+
+\subsection{Step 1: Construct Atomic Preference Memory}
+
+Given a user history $H$, we first identify interaction episodes that contain evidence about a preference, constraint, or temporary goal. LongMemEval motivates decomposing long histories into manageable memory units \cite{wu2025longmemeval}, while QUMem argues that fixed-turn or fixed-token segmentation can mix unrelated events or split an event from its causes and outcomes \cite{wang2026qumem}. We therefore treat episode construction as an evidence-preservation step rather than arbitrary chunking.
+
+From each episode, the extractor produces atomic memory items. Atomicity matters because two facts observed in the same interaction may have different future relevance, validity, or update behavior \cite{wang2026qumem}. A preference memory contains the following core information:
+\begin{itemize}
+    \item \textbf{holder:} whose preference it is;
+    \item \textbf{content:} one atomic preference, constraint, or goal;
+    \item \textbf{kind:} preference, constraint, or goal;
+    \item \textbf{stability:} stable, situational, or temporary;
+    \item \textbf{topic path:} domain, facet, and aspect;
+    \item \textbf{applicability:} observed positive scope and known exclusions;
+    \item \textbf{temporal state:} persistence and validity interval;
+    \item \textbf{evidence:} source turns supporting the abstraction;
+    \item \textbf{confidence/conflict/lifecycle:} how strongly the item is supported and whether it is active, superseded, context-split, or unresolved.
+\end{itemize}
+
+The purpose of this structure is not to maximize metadata. Each field addresses a specific failure mode. Stable-versus-situational state prevents context-specific behavior from becoming a global profile \cite{gao2026s2pref}. Temporal state prevents an old but semantically relevant memory from being treated as current \cite{sun2026pamu,wang2026qumem}. Evidence and confidence keep abstract claims traceable to observations \cite{hou2026personatree}. Conflict state prevents contradictory evidence from being silently collapsed into a single definitive preference \cite{yang2026tangle}. The exact schema is a FrontierMem design choice; the need for these individual capabilities is established by prior work.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Why each group of fields is present in the proposed preference memory. The individual capabilities are largely motivated by prior work; FrontierMem uses them to support an explicit applicability decision.}
+\label{tab:schema}
+\begin{tabularx}{\textwidth}{@{}p{0.17\textwidth}X p{0.27\textwidth}@{}}
+\toprule
+\textbf{Memory component} & \textbf{Reason} & \textbf{Closest supporting work} \\
+\midrule
+Atomic content + kind &
+Separates independently usable preferences, constraints, and goals instead of binding unrelated information into one memory. &
+QUMem \cite{wang2026qumem}; PersonaTree \cite{hou2026personatree} \\
+Stable / situational / temporary &
+Prevents a context-specific observation from being promoted into a permanent global preference. &
+S2Pref \cite{gao2026s2pref}; PAMU \cite{sun2026pamu} \\
+Topic hierarchy &
+Supports organization, retrieval, and localized updates as the memory store grows. &
+PersonaTree \cite{hou2026personatree}; Inside Out \cite{zhao2026insideout} \\
+Positive applicability scope &
+Records where observed evidence supports using the preference. &
+RPEval \cite{feng2026rpeval}; BenchPreS \cite{yoon2026benchpres}; QUMem \cite{wang2026qumem} \\
+Known exclusions &
+Makes non-applicable regions explicit instead of relying only on semantic similarity. &
+BenchPreS \cite{yoon2026benchpres}; MemSyco-Bench \cite{xiang2026memsyco} \\
+Temporal validity &
+Separates semantic relevance from whether a preference is still current. &
+PAMU \cite{sun2026pamu}; QUMem \cite{wang2026qumem} \\
+Evidence + confidence &
+Makes an abstract preference auditable and prevents weak evidence from receiving the same authority as repeated support. &
+PersonaTree \cite{hou2026personatree}; TANGLE \cite{yang2026tangle} \\
+Conflict + lifecycle &
+Preserves context splits, supersession, and unresolved evidence instead of overwriting them. &
+TANGLE \cite{yang2026tangle}; Inside Out \cite{zhao2026insideout} \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\subsection{Step 2: Represent the Applicability Boundary}
+
+The central representation choice is to distinguish evidence for where a preference applies from evidence for where it should not be transferred. For memory $p$, let
+\[
+C^{+}(p)=\{\text{observed conditions supporting application}\},
+\]
+and
+\[
+C^{-}(p)=\{\text{observed conditions supporting non-application}\}.
+\]
+These sets are evidence-bounded: the extractor should not invent conditions that were never supported by the interaction history. The goal is not to infer a complete universal rule from sparse observations. Instead, $C^{+}$ and $C^{-}$ expose the currently known boundary so that extraction, updating, downstream learning, and error analysis refer to the same object.
+
+This design is motivated by the over-application problem observed in BenchPreS \cite{yoon2026benchpres} and by contextual scope control in MemSyco-Bench \cite{xiang2026memsyco}. It also complements S2Pref's distinction between stable and situational preferences \cite{gao2026s2pref}. FrontierMem's hypothesis is that explicitly representing both sides of the boundary makes preference transfer easier to learn and audit than storing only a context-free preference statement.
+
+\subsection{Step 3: Retrieve Candidates, but Do Not Equate Retrieval with Use}
+
+For a new query $q$, the memory system retrieves a small candidate set $\mathcal{M}_q$. Retrieval can use semantic similarity, topic structure, time, or other indexing signals. However, retrieval is only candidate generation:
+\[
+\text{retrieved}(p,q) \not\Rightarrow \text{applicable}(p,q).
+\]
+This separation is necessary because semantic relevance and decision authority are different. QUMem shows that individually relevant top-$k$ memories may fail to jointly capture preference evolution, temporal validity, and contextual applicability \cite{wang2026qumem}; RPEval shows that irrelevant personalized information can actively interfere with intent reasoning \cite{feng2026rpeval}. We therefore place an explicit applicability model after retrieval.
+
+\subsection{Step 4: Learn Preference--Query Applicability}
+
+For the controlled applicability experiment, we isolate this stage from extraction errors. The input is a released preference/evidence item $p$ and query $q$:
+\[
+x=(p,q).
+\]
+On RPEval, the native labels are
+\[
+y\in\{\textsc{Ignore},\textsc{Support},\textsc{Dominate}\}.
+\]
+We preserve these labels rather than converting the benchmark into a newly generated task. A three-way classifier produces logits
+\[
+(\ell_I,\ell_S,\ell_D).
+\]
+We define an applicability score by comparing the combined applicable mass against \textsc{Ignore}:
+\[
+s(x)
+=
+\log\left(e^{\ell_S}+e^{\ell_D}\right)-\ell_I.
+\]
+Thus, larger $s(x)$ means stronger evidence that the preference should influence the query.
+
+A pointwise baseline minimizes the native cross-entropy loss:
+\[
+\mathcal{L}_{\text{point}}
+=
+\operatorname{CE}(x,y).
+\]
+This is an important baseline because it uses exactly the benchmark's original supervision.
+
+\subsection{Step 5: CAID Adds Same-Query Contrast Supervision}
+
+RPEval contains multiple annotated preferences for the same released query. This allows us to construct \emph{benchmark-native query--preference contrast pairs} without generating new text. For a fixed query $q$, let
+\[
+x^{+}=(p^{+},q),
+\qquad
+y^{+}\in\{\textsc{Support},\textsc{Dominate}\},
+\]
+and
+\[
+x^{-}=(p^{-},q),
+\qquad
+y^{-}=\textsc{Ignore}.
+\]
+The positive/negative terminology refers only to applicability under the native label for that query; it does not mean that a preference is globally good or bad.
+
+Pointwise training sees the two examples independently. CAID additionally requires the applicable preference to score above the ignored preference:
+\[
+s(x^{+})-s(x^{-})\ge m,
+\]
+with hinge ranking loss
+\[
+\mathcal{L}_{\text{rank}}
+=
+\max\left(0,\,
+m-\left[s(x^{+})-s(x^{-})\right]\right).
+\]
+The complete objective is
+\[
+\mathcal{L}_{\text{CAID}}
+=
+\mathcal{L}_{\text{native}}
++
+\lambda\mathcal{L}_{\text{rank}}.
+\]
+The comparison is deliberately controlled: Pointwise and CAID use the same base model, native labels, training examples, split, and compute budget; CAID differs only by the pairwise applicability constraint.
+
+These pairs are \textbf{not causal counterfactual context pairs}. The query is fixed while the released preference changes. The construction provides observational contrast supervision over preference--query compatibility, not an intervention on user context. We therefore avoid causal claims from this experiment.
+
+\subsection{Step 6: Apply, Ignore, or Clarify}
+
+At inference time, the model ultimately supports three downstream actions:
+\[
+d(p,q)\in\{\textsc{Apply},\textsc{Ignore},\textsc{Clarify}\}.
+\]
+\textsc{Clarify} is \textbf{not} introduced as a fourth RPEval classifier label. The native classifier remains \textsc{Ignore}/\textsc{Support}/\textsc{Dominate}. Clarification is a selective downstream action derived from calibrated uncertainty or set-valued prediction over the Apply-versus-Ignore decision. This preserves the original benchmark task and prevents us from fabricating clarification labels.
+
+The motivation is query-specific decision identifiability. Let $z$ denote a latent explanation of the observed history---for example, a stable preference, temporary constraint, or context-specific goal---and let $\mathcal{Z}(H)$ be the set of explanations plausibly compatible with history $H$. Define
+\[
+D(z,q)\in\{\textsc{Apply},\textsc{Ignore}\}.
+\]
+If all plausible explanations agree,
+\[
+D(z,q)=a
+\qquad
+\forall z\in\mathcal{Z}(H),
+\]
+then the preference-use decision is identifiable for query $q$ even if the exact latent explanation is not. If plausible explanations disagree, the available evidence does not resolve the decision:
+\[
+\exists z_1,z_2\in\mathcal{Z}(H)
+\quad\text{s.t.}\quad
+D(z_1,q)\neq D(z_2,q).
+\]
+This is the case in which clarification is conceptually justified. TANGLE provides closely related evidence that unresolved personal-memory conflicts require calibrated action and targeted clarification rather than forced resolution \cite{yang2026tangle}; partial-identifiability work provides the broader formal precedent that a latent object can remain ambiguous while an application-level decision may still be well-defined \cite{skalse2026partial}.
+
+In the practical system, we do not claim to enumerate $\mathcal{Z}(H)$ exactly. Calibrated predictive uncertainty is only an \emph{operational proxy} for unresolved decision ambiguity. This distinction is important: uncertainty and non-identifiability are related, but they are not mathematically identical.
+
+\subsection{Full System vs.\ Controlled Applicability Experiment}
+
+FrontierMem is an end-to-end memory framework:
+\[
+\text{History}
+\rightarrow
+\text{Memory Extraction}
+\rightarrow
+\text{Structured Memory}
+\rightarrow
+\text{Retrieval}
+\rightarrow
+\text{Applicability}
+\rightarrow
+\text{Response}.
+\]
+However, the main controlled applicability experiment intentionally studies
+\[
+\text{Preference + Query}
+\rightarrow
+\text{Applicability Model}.
+\]
+This does not remove memory extraction from the project. It isolates the scientific question: if the preference evidence is already available, can the model learn when it should be used? Otherwise, extraction errors and applicability errors would be mixed together and improvements would be difficult to attribute. Memory-construction quality is therefore evaluated separately before the complete end-to-end system is tested.
+
+\section{Current Research Questions}
+
+The present draft leads to three direct empirical questions:
+\begin{enumerate}
+    \item Can current instruction models reliably construct the proposed evidence-grounded preference memory, especially holder, stability, temporal state, applicability scope, and conflict?
+    \item Under matched data and compute, does CAID improve preference--query applicability over native pointwise training, particularly on implicit and boundary cases?
+    \item Can calibrated selective prediction reduce harmful preference application while retaining useful personalization, and does this behavior transfer to external benchmarks such as BenchPreS and MemSyco-Bench?
+\end{enumerate}
+We leave numerical answers to these questions blank until the corresponding experiments are completed.
+
+\section{Conclusion}
+
+The central premise of FrontierMem is simple: \emph{memory retrieval should not automatically grant a preference authority over the current response}. A persistent assistant must remember user information, but it must also reason about the scope of that information. We therefore represent preferences with explicit evidence and applicability boundaries, separate retrieval from applicability, learn the preference--query boundary with CAID, and reserve clarification for unresolved cases. The next stage of the project is empirical: first validate structured memory extraction, then compare Pointwise and CAID under matched conditions, and finally test selective applicability on external benchmarks.
+
+\begin{thebibliography}{99}
+
+\bibitem{zhong2024memorybank}
+W. Zhong, L. Guo, Q. Gao, H. Ye, and Y. Wang.
+\newblock MemoryBank: Enhancing Large Language Models with Long-Term Memory.
+\newblock \emph{AAAI}, 38(17):19724--19731, 2024.
+\newblock doi:10.1609/aaai.v38i17.29946.
+
+\bibitem{packer2023memgpt}
+C. Packer, S. Wooders, K. Lin, V. Fang, S. G. Patil, I. Stoica, and J. E. Gonzalez.
+\newblock MemGPT: Towards LLMs as Operating Systems.
+\newblock arXiv:2310.08560, 2023.
+
+\bibitem{wu2025longmemeval}
+D. Wu, H. Wang, W. Yu, Y. Zhang, K.-W. Chang, and D. Yu.
+\newblock LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory.
+\newblock \emph{ICLR}, 2025.
+
+\bibitem{jiang2025personamemv2}
+B. Jiang, Y. Yuan, M. Shen, Z. Hao, Z. Xu, Z. Chen, Z. Liu, A. R. Vijjini, J. He, H. Yu, R. Poovendran, G. Wornell, L. Ungar, D. Roth, S. Chen, and C. J. Taylor.
+\newblock PersonaMem-v2: Towards Personalized Intelligence via Learning Implicit User Personas and Agentic Memory.
+\newblock arXiv:2512.06688, 2025.
+
+\bibitem{feng2026rpeval}
+X. Feng, W. Gan, X. Chen, Q. Dai, and Y. Liu.
+\newblock How Does Personalized Memory Shape LLM Behavior? Benchmarking Rational Preference Utilization in Personalized Assistants.
+\newblock arXiv:2601.16621, 2026.
+
+\bibitem{yoon2026benchpres}
+S. Yoon, S. Kim, H. Hong, W. Jeung, Y. Kim, W. Seo, H. Yeen, and A. No.
+\newblock BenchPreS: A Benchmark for Context-Aware Personalized Preference Selectivity of Persistent-Memory LLMs.
+\newblock arXiv:2603.16557, 2026.
+
+\bibitem{guo2026realpref}
+Q. Guo, Y. Li, Y. Liu, and B. Hooi.
+\newblock Towards Realistic Personalization: Evaluating Long-Horizon Preference Following in Personalized User-LLM Interactions.
+\newblock arXiv:2603.04191, 2026.
+
+\bibitem{xiao2026alpsbench}
+J. Xiao, X. Yu, C. Wang, W. Zheng, X. Lin, K. Liu, H. Ding, Y. Zhang, W. Wang, F. Feng, and X. He.
+\newblock AlpsBench: An LLM Personalization Benchmark for Real-Dialogue Memorization and Preference Alignment.
+\newblock arXiv:2603.26680, 2026.
+
+\bibitem{gao2026s2pref}
+C. Gao, Y. Huang, J. Yao, X. Wu, and J. Feng.
+\newblock Beyond Static Profiles: Capturing the Fluidity of User Preferences in Diverse Scenarios.
+\newblock \emph{Findings of ACL}, pages 20618--20634, 2026.
+\newblock doi:10.18653/v1/2026.findings-acl.1033.
+
+\bibitem{sun2026pamu}
+H. Sun, Z. Zhang, and S. Zeng.
+\newblock Preference-Aware Memory Update for Long-Term LLM Agents.
+\newblock \emph{Findings of ACL}, pages 783--793, 2026.
+\newblock doi:10.18653/v1/2026.findings-acl.38.
+
+\bibitem{zhao2026insideout}
+J. Zhao, D. Chen, Z. Fan, K. Xu, M. Hu, B. Tang, F. Xiong, and Z. Li.
+\newblock Inside Out: Evolving User-Centric Core Memory Trees for Long-Term Personalized Dialogue Systems.
+\newblock \emph{ACL}, pages 13429--13446, 2026.
+\newblock doi:10.18653/v1/2026.acl-long.614.
+
+\bibitem{hou2026personatree}
+Y. Hou, J. Song, H. Zhang, Z. Chen, B. Xiao, T. Wan, and Z. Qin.
+\newblock PersonaTree: Structured Lifecycle Memory for Person Understanding in LLM Agents.
+\newblock arXiv:2606.04780, 2026.
+
+\bibitem{xiang2026memsyco}
+Z. Xiang, Z. Chen, Y. Tang, Z. Wei, R. Ning, Y. Lin, Q. Zhang, and J. Su.
+\newblock MemSyco-Bench: Benchmarking Sycophancy in Agent Memory.
+\newblock arXiv:2607.01071, 2026.
+
+\bibitem{yang2026tangle}
+L. Yang, S. Xu, Z. Li, T. Yang, and L. Huang.
+\newblock When Personal Memory Has No Single Answer: Evaluating LLM Agents under Irreducible Conflict.
+\newblock arXiv:2608.13921, 2026.
+
+\bibitem{wang2026qumem}
+H. Wang, Y. Li, L. Zhang, P. Li, X. Che, X. Zhang, and Z. Yang.
+\newblock QUMem: Personalized Memory for Query-Conditioned User-State Inference in LLM Agents.
+\newblock arXiv:2608.16168, 2026.
+
+\bibitem{skalse2026partial}
+J. Skalse and A. Abate.
+\newblock Partial Identifiability and Misspecification in Inverse Reinforcement Learning.
+\newblock \emph{Artificial Intelligence}, 356:104525, 2026.
+\newblock doi:10.1016/j.artint.2026.104525.
+
+\end{thebibliography}
+
+\end{document}
