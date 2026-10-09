@@ -1,2 +1,23 @@
 data/external_raw/
 data/external_processed/query_preference_contrast_pairs.jsonl
+
+# ML checkpoints and caches; large binary model outputs belong in Kaggle/HF artifacts
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+*.gguf
+*Checkpoint*.zip
+*Evaluation_Results.zip
+frontiermem_seed17_no_repeat/
+frontiermem_v4_final/
+**/__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+__notebook__.ipynb
+__results__.html
+# Credentials or local-only config
+.env
+.env.*
+*.pem
+*.key

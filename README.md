@@ -58,3 +58,11 @@ See `docs/REPOSITORY_GUIDE.md` and `docs/EXPERIMENTS.md` for the complete artifa
 ## Interpretation caveat
 
 This remains a controlled synthetic proof of concept. The rule-based system is aligned with scenario templates, and the current Qwen runs are small-sample prompt-based evaluations rather than final fine-tuned results. The next scientific step is structured supervised fine-tuning / counterfactual training on more natural histories and transfer evaluation.
+
+## 2026-10 Qwen3 applicability-classifier update (preliminary)
+
+The repository also now contains a **Qwen3-4B-Instruct-2507** supervised classification experiment comparing **Pointwise** and **CAID pairwise** objectives on RPEval preference/query applicability. This is a separate, newer experiment from the synthetic end-to-end prototype results above; its metrics are **not directly comparable** to that table.
+
+CAID Seed 17 completed training on Kaggle, selecting **epoch 1** by development binary macro-F1 (0.995327); no Qwen3 held-out test results are posted yet. Earlier Pointwise Seed 17 best checkpoint was also epoch 1, but the full planned Pointwise training schedule did not complete. The primary open question is external generalization to RPEval Explicit, RPEval Implicit, and English BenchPreS. The Kaggle **Stage B evaluation** uses saved checkpoints and requires no retraining.
+
+For original notebooks, exact standalone scripts, dataset/split caveats, no-upload Kaggle workflow, and scientific limitations, see **[Qwen3 CAID Seed-17 Runbook](docs/QWEN3_CAID_SEED17_RUNBOOK.md)**. Do not publish adapter weights or claim new test performance before Stage B results have been checked.
