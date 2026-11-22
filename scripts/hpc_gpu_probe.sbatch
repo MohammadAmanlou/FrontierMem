@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=fm-gpu-probe
-#SBATCH --partition=cuda
-#SBATCH --qos=cuda
+#SBATCH --partition=short_mdbf
+#SBATCH --qos=short_mdbf
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a100_80gb:1
 #SBATCH --mem=8G
 #SBATCH --time=00:10:00
 #SBATCH --output=fm-gpu-probe-%j.out
 #SBATCH --error=fm-gpu-probe-%j.err
+# Request an A100 80GB specifically instead of accepting arbitrary/K80 GPUs.
+# The allocation may stay pending if A100 is busy.
 # If the scheduler complains about AccountNotAllowed/InvalidAccount,
 # consult your cluster association; do not guess another user's account.
 set -euo pipefail
