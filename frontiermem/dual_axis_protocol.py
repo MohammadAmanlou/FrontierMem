@@ -117,12 +117,12 @@ def format_side(side: dict) -> str:
     return "\n".join(segments)
 
 
-def summary(data: dict, arm: str) -> dict:
+def summary(data: dict, arm: str, model: str = "Qwen/Qwen3.5-9B") -> dict:
     if arm not in ARMS:
         raise ValueError("Invalid training arm")
     return {
         "arm": arm,
-        "model": "Qwen/Qwen3-4B-Instruct-2507",
+        "model": model,
         "rpeval_train_pairs": len(data["rpeval_train"]),
         "rpeval_dev_pairs": len(data["rpeval_dev"]),
         "s2pref_train_pairs": len(data["s2pref_train"]) if arm in BINARY_ARMS else 0,
