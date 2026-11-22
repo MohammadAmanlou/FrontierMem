@@ -13,6 +13,8 @@ on:
       - 'tests/test_hpc_data_preflight.py'
       - 'scripts/audit_s2pref_candidates.py'
       - 'tests/test_s2pref_candidate_audit.py'
+      - 'scripts/prepare_dual_axis_run.py'
+      - 'tests/test_prepare_dual_axis_run.py'
       - 'scripts/demo_decision_memory.py'
       - '.github/workflows/decision-memory-tests.yml'
 jobs:
@@ -27,6 +29,6 @@ jobs:
       - name: Install minimal CPU dependencies
         run: python -m pip install pytest 'pandas>=2.0'
       - name: Run standalone decision-memory tests
-        run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py tests/test_hpc_data_preflight.py tests/test_s2pref_candidate_audit.py
+        run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py tests/test_hpc_data_preflight.py tests/test_s2pref_candidate_audit.py tests/test_prepare_dual_axis_run.py
       - name: Run non-scientific plumbing demonstration
         run: python scripts/demo_decision_memory.py | grep 'DEMO_ONLY_NOT_RESEARCH_EVIDENCE'
