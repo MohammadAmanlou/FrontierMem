@@ -20,6 +20,10 @@ on:
       - 'tests/test_dual_axis_qwen_protocol.py'
       - 'scripts/hpc_model_env_preflight.py'
       - 'tests/test_backbone_selection.py'
+      - 'scripts/hpc_bootstrap_qwen_env.sbatch'
+      - 'scripts/hpc_smoke_qwen35.sbatch'
+      - 'scripts/hpc_queue_first_stages.sh'
+      - 'scripts/hpc_collect_pipeline_status.sh'
       - 'docs/MODEL_BACKBONE_DECISION_2026-11-22.md'
       - 'scripts/demo_decision_memory.py'
       - '.github/workflows/decision-memory-tests.yml'
@@ -36,5 +40,7 @@ jobs:
         run: python -m pip install pytest 'pandas>=2.0'
       - name: Run standalone decision-memory tests
         run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py tests/test_hpc_data_preflight.py tests/test_s2pref_candidate_audit.py tests/test_prepare_dual_axis_run.py tests/test_dual_axis_qwen_protocol.py tests/test_backbone_selection.py
+      - name: Syntax-check unattended HPC batch scripts
+        run: bash -n scripts/hpc_bootstrap_qwen_env.sbatch scripts/hpc_smoke_qwen35.sbatch scripts/hpc_queue_first_stages.sh scripts/hpc_collect_pipeline_status.sh
       - name: Run non-scientific plumbing demonstration
         run: python scripts/demo_decision_memory.py | grep 'DEMO_ONLY_NOT_RESEARCH_EVIDENCE'
