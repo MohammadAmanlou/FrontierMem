@@ -80,7 +80,7 @@ def parse_args(argv=None):
     p.add_argument("--s2pref-dir", type=Path,
                    default=Path("data/local/s2pref_candidates"))
     p.add_argument("--output-dir", type=Path, default=None)
-    p.add_argument("--model", default="Qwen/Qwen3-4B-Instruct-2507")
+    p.add_argument("--model", default="Qwen/Qwen3.5-9B")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--allow-silver-exploratory", action="store_true",
                    help="Permit experimental silver training; NOT a gold-label approval")
@@ -256,7 +256,7 @@ def train(args, data, info):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if (args.output_dir / "training_summary.json").exists():
         raise RuntimeError("This run directory already has a completed result; specify a new --output-dir")
-    torch, model, tokenizer = setup_torch_model(args)
+    # Qwen3.5/3.8 multimodal configs may require a text-specific classification\n    # implementation and recent Transformers/PEFT; fail closed on GPU smoke\n    # rather than interpreting a dry-run as proven model compatibility.\n    torch, model, tokenizer = setup_torch_model(args)
     import torch.nn.functional as F
 
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
@@ -393,7 +393,7 @@ def train(args, data, info):
 def main(argv=None):
     args = parse_args(argv)
     data = load_and_verify(args.manifest, args.rpeval_pairs, args.s2pref_dir)
-    info = summary(data, args.arm)
+    info = summary(data, args.arm, args.model)
     steps = math.ceil(len(data["rpeval_train"]) / args.pairs_per_batch)
     info["rpeval_batches_full_epoch"] = steps
     info["rpeval_batches_this_epoch"] = min(args.max_train_steps, steps) if args.max_train_steps else steps
