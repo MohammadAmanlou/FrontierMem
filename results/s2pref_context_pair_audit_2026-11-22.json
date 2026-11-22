@@ -1,0 +1,24 @@
+{
+  "audit_date": "2026-11-22",
+  "source_path_name": "FrontierMem_Phase_01.zip",
+  "source_archive_sha256": "87eba9d53e313fed2cf5110e93341c56cf4b5948c54a9be8c779d20c61bccd66",
+  "source_file": "phase_01/s2pref_manifest_with_splits.csv",
+  "upstream_label_type": "S2Pref_derived_silver_NOT_gold",
+  "pairs_by_split": {"train": 890, "dev": 190, "test": 200},
+  "atomic_rows_by_split": {"train": 1780, "dev": 380, "test": 400},
+  "source_groups_by_split": {"train": 89, "dev": 19, "test": 20},
+  "pair_structure_checks": {
+    "total_pairs": 1280,
+    "exactly_two_sides": 1280,
+    "same_preference": 1280,
+    "same_query": 1280,
+    "same_history": 1280,
+    "distinct_context": 1280,
+    "opposite_actions": 1280,
+    "cross_split_source_group_overlap": 0
+  },
+  "test_exported": false,
+  "semantic_annotation_audit": "PENDING",
+  "training_status": "CANDIDATE_ONLY",
+  "provenance": "Historical FrontierMem_Phase_01.zip supplied in prior project work; aggregated values recomputed locally 2026-11-22"
+}
