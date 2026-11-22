@@ -31,7 +31,7 @@ def spair(split, idx, sha):
         "positive": {"example_id":"spos"+str(idx), "preference":"Prefer peace "+str(idx),
                      "context":"Quiet group "+str(idx), "history":"",
                      "query":"What to do?", "action":"APPLY"},
-        "negative": {"example_id":"sneg"+str(idx), "preference":"Prefer peace",
+        "negative": {"example_id":"sneg"+str(idx), "preference":"Prefer peace "+str(idx),
                      "context":"Noisy group "+str(idx), "history":"",
                      "query":"What to do?", "action":"IGNORE"},
     }
