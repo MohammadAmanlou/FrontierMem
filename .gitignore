@@ -21,3 +21,11 @@ __results__.html
 .env.*
 *.pem
 *.key
+
+# HPC-local inventory, scheduler logs and private experiment outputs
+hpc_inventory*.txt
+fm-gpu-probe-*.out
+fm-gpu-probe-*.err
+slurm-*.out
+data/local/
+*.log
