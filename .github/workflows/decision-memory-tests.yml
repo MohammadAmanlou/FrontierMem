@@ -7,6 +7,8 @@ on:
     paths:
       - 'frontiermem/decision_memory.py'
       - 'tests/test_decision_memory.py'
+      - 'tests/test_s2pref_pair_export.py'
+      - 'scripts/export_s2pref_context_pairs.py'
       - 'scripts/demo_decision_memory.py'
       - '.github/workflows/decision-memory-tests.yml'
 jobs:
@@ -21,6 +23,6 @@ jobs:
       - name: Install minimal CPU dependencies
         run: python -m pip install pytest 'pandas>=2.0'
       - name: Run standalone decision-memory tests
-        run: python -m pytest -q tests/test_decision_memory.py
+        run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py
       - name: Run non-scientific plumbing demonstration
         run: python scripts/demo_decision_memory.py | grep 'DEMO_ONLY_NOT_RESEARCH_EVIDENCE'
