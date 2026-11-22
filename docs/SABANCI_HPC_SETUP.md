@@ -1,10 +1,10 @@
 # Sabancı University HPC connection and FrontierMem setup
 
-This guide summarizes the **2026-09-16 SU-Net guest VPN message** and **2026-10-26 Sine Mete HPC access message** sent to the account owner. **Never commit, copy, or share either password.** The linked University's documentation takes priority over a dated email if access policies change.
+This guide summarizes a personal SU-Net guest VPN confirmation and an HPC access confirmation sent to the account owner. **Never commit, copy, or share either password.** The linked University's documentation takes priority over a dated email if access policies change.
 
 ## Access facts (no secrets)
-- VPN login: `guest1131@sabanciuniv.edu` (the @domain suffix is required).
-- HPC SSH username: `guest1131`.
+- VPN login: `<YOUR_SU_VPN_USERNAME>@sabanciuniv.edu` (the @domain suffix is required).
+- HPC SSH username: `<YOUR_HPC_USERNAME>`.
 - Allowed HPC hosts: `tosun.sabanciuniv.edu`, `sakura.sabanciuniv.edu`, `tortoise.sabanciuniv.edu`.
 - HPC email announced partitions/QoS: `cuda`, `long_mdbf`, `longer_mdbf`, `mid_mdbf`, `short_mdbf`.
 - Email's initial test: `srun -N2 -n2 --partition=short_mdbf --qos=short_mdbf hostname`.
@@ -21,7 +21,7 @@ Documentation:
 2. Connect with the SU-Net VPN login above and your own VPN password; confirm `Connected`.
 3. Open PowerShell/Windows Terminal (or PuTTY/MobaXterm), then:
    ```powershell
-   ssh guest1131@tosun.sabanciuniv.edu
+   ssh <YOUR_HPC_USERNAME>@tosun.sabanciuniv.edu
    ```
 4. On first connection verify the host key against a trusted University source, not merely the unknown SSH prompt. Use the HPC password from your Sine Mete email. Terminal password input is invisible.
 5. Change the initial HPC password with `passwd` if it has not already been changed. Do not reuse the VPN password.
