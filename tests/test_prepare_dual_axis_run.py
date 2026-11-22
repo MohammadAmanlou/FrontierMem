@@ -28,7 +28,7 @@ def spair(split, idx, sha):
         "usage": split+"_candidate",
         "pair_type": "same_preference_same_query_opposite_context",
         "label_status": "S2Pref_derived_silver_unreviewed",
-        "positive": {"example_id":"spos"+str(idx), "preference":"Prefer peace",
+        "positive": {"example_id":"spos"+str(idx), "preference":"Prefer peace "+str(idx),
                      "context":"Quiet group "+str(idx), "history":"",
                      "query":"What to do?", "action":"APPLY"},
         "negative": {"example_id":"sneg"+str(idx), "preference":"Prefer peace",
