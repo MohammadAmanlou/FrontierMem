@@ -56,18 +56,26 @@ From the checked-out repository:
 sbatch scripts/hpc_gpu_probe.sbatch
 squeue -u "$USER"
 ```
-On completion, read `fm-gpu-probe-<JOBID>.out` and `fm-gpu-probe-<JOBID>.err`.
+On completion, read `fm-gpu-probe-<JOBID>.out` and `fm-gpu-probe-<JOBID>.err`. If `squeue -j JOBID` later says `Invalid job id`, check the output directly: the completed job may have left the live scheduler queue. If `sacct` reports a localhost:6819 connection error, Slurm accounting is unavailable and this does not imply the batch job failed.
 The job prints the GPU model, memory, CUDA visibility, Python and PyTorch availability.
-The template requests `--partition=cuda --qos=cuda --gres=gpu:1` as indicated by University docs and the email. On `InvalidAccount`, `InvalidQOS`, `InvalidPartition`, or `Resources` issues, inspect `scontrol show partition cuda`, `sinfo`, and your assigned association with IT, rather than guessing an account.
+The updated template requests `--partition=short_mdbf --qos=short_mdbf --gres=gpu:a100_80gb:1` to avoid arbitrary Tesla K80 allocations (observed on job 4289445 on 2026-11-22). The A100 may be queued. On `InvalidAccount`, `InvalidQOS`, `InvalidPartition`, or `Resources` issues, inspect `scontrol show partition cuda`, `sinfo`, and your assigned association with IT, rather than guessing an account.
 
 ## 3. Python/LLM environment, after GPU allocation is verified
-Use `module avail` to inspect available Python, CUDA and frameworks. Prefer the HPC-provided version or virtual environment/Apptainer permitted by IT. Downloading Qwen checkpoints and CUDA packages can be large and may require Internet access or a mirror; arrange a quota-aware directory before installation.
+Do not install PyTorch into the system Python or onto the login node. The system Python 3.12.3 on login has no `pip` in the 2026-11-22 inventory. Inspect `module avail python`, `module spider python`, `python3 -m venv --help`, and `python3 -m ensurepip --version` first; use an HPC-provided Python module and a user virtual environment if supported. Use `module avail` to inspect available Python, CUDA and frameworks. Prefer the HPC-provided version or virtual environment/Apptainer permitted by IT. Downloading Qwen checkpoints and CUDA packages can be large and may require Internet access or a mirror; arrange a quota-aware directory before installation.
 
 A Qwen3-4B experiment uses CUDA GPU resources; start with a tiny forward-only check **inside Slurm**. Do not presume all partitions have the same GPU model or that 4-bit QLoRA will work until CUDA and package compatibility are verified.
 
 For the three-week study, prioritize existing RPEval/CAID checkpoints, then a matched Pointwise/CAID/CAID+S2Pref binary/Dual-Axis run. Unreviewed silver S2Pref training candidates are not approved gold. Official BenchPreS and S2Pref heldout test are never used to optimize training or memory selection.
 
-## 4. Trouble diagnosis
+## 4. Real access probe findings (2026-11-22)
+- Login host: `login`; user home under `/cta/users/<user>`.
+- `sbatch` accepted job 4289445 on `cn06`, allocated a Tesla K80 11,441 MiB, NVIDIA driver 470.256.02 (CUDA max 11.4 reported by driver), and completed the lightweight report; this is not a suitable Qwen3-4B training GPU.
+- `sinfo` lists A100 80GB and H200 NVL GPUs under `short_mdbf` and `cuda`, but listings are not guarantees of actual allocation.
+- BeeGFS filesystem shared capacity was 64T total / 59T used / 5.6T available (92%); this is **not** the account quota.
+- `sacct` failed due to accounting DB connection refusal; do not interpret that error as a GPU job crash.
+- Updated probe requests A100 80GB by named GRES and uses `short_mdbf`/`short_mdbf` with 10-minute duration. Run `git pull --ff-only` from the research branch to obtain it.
+
+## 5. Trouble diagnosis
 - `ssh: Could not resolve hostname`: verify VPN, DNS, hostname spelling, or ask IT.
 - `Connection timed out`: VPN policy/firewall, host health, try University's documented jump-host procedure.
 - `Permission denied (publickey,password)`: check **HPC** login name/password (not VPN) and account status.
