@@ -46,12 +46,13 @@ Build and fairly evaluate Pointwise, existing CAID and Dual-Axis CAID, then comp
 ## Main ablation
 - E1: shared CE3 + BCE2 (Pointwise).
 - E2: E1 + preference ranking (original CAID).
-- E3: E2 + context ranking with absolute supervision (Dual-Axis).
-- E4: E3 + decision-aware evidence selection.
-- E5: E3 + fixed-budget random/semantic/summary selection.
+- E3a: E2 + disjoint S2Pref-derived silver context data, supervised with **binary BCE2 only**, ContextRank coefficient = 0 (extra-data control).
+- E3b: identical S2Pref data and update budget as E3a, but ContextRank coefficient > 0 (Dual-Axis).
+- E4: E3b + decision-aware evidence selection.
+- E5: E3b + fixed-budget random/semantic/summary selection.
 - E6: E4 + dev-calibrated CLARIFY, at matched coverage.
 
-Use `Qwen/Qwen3-4B-Instruct-2507`, pinned tokenizer, identical inputs, groups, seed and optimization budget for E1–E3. Existing Kaggle seed-17 checkpoints are diagnostic, not matched final ablation evidence.
+Use `Qwen/Qwen3-4B-Instruct-2507`, pinned tokenizer, identical inputs, groups, seed and optimization budget for E1–E3b. RPEval supplies native CE3, while S2Pref-derived binary labels supply BCE2 and context ranking only; never invent S2Pref SUPPORT/DOMINATE classes. E2 vs E3a measures additional supervision; **E3a vs E3b isolates context ranking**. Existing Kaggle seed-17 checkpoints are diagnostic, not matched final ablation evidence.
 
 ## Metrics and reporting
 - Native 3-class and binary Macro-F1, APPLY recall, wrong-APPLY rate, accuracy, confusion matrices.
