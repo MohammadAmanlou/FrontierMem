@@ -29,3 +29,9 @@ fm-gpu-probe-*.err
 slurm-*.out
 data/local/
 *.log
+
+# Unattended Slurm Qwen bootstrap/smoke outputs
+fm-qwen-env-*.out
+fm-qwen-env-*.err
+fm-qwen-smoke-*.out
+fm-qwen-smoke-*.err
