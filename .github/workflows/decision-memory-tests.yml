@@ -1,0 +1,26 @@
+name: Decision-memory unit tests
+on:
+  push:
+    branches:
+      - 'research/decision-sufficient-memory-2026-11'
+  pull_request:
+    paths:
+      - 'frontiermem/decision_memory.py'
+      - 'tests/test_decision_memory.py'
+      - 'scripts/demo_decision_memory.py'
+      - '.github/workflows/decision-memory-tests.yml'
+jobs:
+  test-decision-memory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal CPU dependencies
+        run: python -m pip install pytest 'pandas>=2.0'
+      - name: Run standalone decision-memory tests
+        run: python -m pytest -q tests/test_decision_memory.py
+      - name: Run non-scientific plumbing demonstration
+        run: python scripts/demo_decision_memory.py | grep 'DEMO_ONLY_NOT_RESEARCH_EVIDENCE'
