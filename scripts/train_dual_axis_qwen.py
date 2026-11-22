@@ -118,7 +118,7 @@ def planned_silver_steps(rpeval_count, silver_count, pair_batch_size, cap=0):
     total = math.ceil(rpeval_count / pair_batch_size)
     used = min(total, cap) if cap else total
     if silver_count > total:
-        raise ValueError("Increase pairs-per-batch? No: reduce it; silver pairs must fit in RPEval steps")
+        raise ValueError("Silver train pairs exceed RPEval batches; reduce --pairs-per-batch")
     return sum(silver_index_for_step(i, total, silver_count) is not None for i in range(used))
 
 
