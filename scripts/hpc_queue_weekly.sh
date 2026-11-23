@@ -30,7 +30,7 @@ if [[ -e "$RECORD" ]]; then
   exit 6
 fi
 # Test the two accounts/partitions without occupying resources.
-sbatch --test-only --account=cuda --array=0-3%1 \
+sbatch --test-only --account=cuda scripts/hpc_weekly_reload.sbatch || {\n  echo "Reload job test failed; no weekly jobs submitted" >&2\n  exit 9\n}\nsbatch --test-only --account=cuda --array=0-3%1 \
   --dependency=afterok:"$SMOKE_ID" scripts/hpc_weekly_train.sbatch || {
     echo "CUDA/GPU submission test failed; no actual weekly jobs submitted" >&2
     exit 7
@@ -43,10 +43,10 @@ sbatch --test-only --account=mdbf scripts/hpc_weekly_report.sbatch || {
   echo -e "stage\tjob_id\tdependency"
   echo -e "existing_smoke\t$SMOKE_ID\tpreexisting"
 } > "$RECORD"
-# Write each submitted job immediately so failures cannot silently duplicate submissions.
+# Write each submitted job immediately so failures cannot silently duplicate submissions.\nRELOAD="$(sbatch --parsable --account=cuda --dependency=afterok:"$SMOKE_ID" scripts/hpc_weekly_reload.sbatch)"\necho -e "smoke_adapter_reload\\t$RELOAD\\tafterok:$SMOKE_ID" >> "$RECORD"\necho "Reload verification job: $RELOAD"
 FIRST="$(sbatch --parsable --account=cuda --array=0-3%1 \
-  --dependency=afterok:"$SMOKE_ID" scripts/hpc_weekly_train.sbatch)"
-echo -e "primary_seed17_4arms\t$FIRST\tafterok:$SMOKE_ID" >> "$RECORD"
+  --dependency=afterok:"$RELOAD" scripts/hpc_weekly_train.sbatch)"
+echo -e "primary_seed17_4arms\t$FIRST\tafterok:$RELOAD" >> "$RECORD"
 echo "Primary 4-arm array: $FIRST"
 
 EARLY="$(sbatch --parsable --account=mdbf \
