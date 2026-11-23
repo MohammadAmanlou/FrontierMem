@@ -115,3 +115,15 @@ def test_unseen_dev_remains_group_disjoint(tmp_path):
     data=load_and_verify(man,rp,sp)
     assert {x["group_id"] for x in data["s2pref_train"]}.isdisjoint(
         {x["group_id"] for x in data["s2pref_strict_dev"]})
+
+
+def test_gpu_train_function_really_calls_model_initializer():
+    # Parsing catches a prior bug where the setup call was accidentally
+    # embedded in a Python comment containing literal backslash-n characters.
+    import ast
+    from pathlib import Path
+    tree = ast.parse(Path("scripts/train_dual_axis_qwen.py").read_text(encoding="utf8"))
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "train")
+    calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call) and
+             isinstance(n.func, ast.Name) and n.func.id == "setup_torch_model"]
+    assert len(calls) == 1, "GPU training must initialize model inside train()"
