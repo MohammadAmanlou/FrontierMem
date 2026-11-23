@@ -62,7 +62,10 @@ def test_four_arms_and_immutable_splits(tmp_path):
     assert summary(data,"dual_axis")["s2pref_context_rank_enabled"]
     assert summary(data,"caid_s2pref")["s2pref_context_rank_enabled"] is False
     assert summary(data,"pointwise")["s2pref_train_pairs"] == 0
-    assert "[CONTEXT]" in format_side(data["s2pref_train"][0]["positive"])
+    serialized=format_side(data["s2pref_train"][0]["positive"])
+    assert "[CONTEXT]" in serialized
+    assert serialized.startswith("[QUERY]")
+    assert serialized.index("[QUERY]") < serialized.index("[PREFERENCE]")
 
 
 def test_tampering_after_freeze_is_rejected(tmp_path):
