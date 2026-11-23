@@ -26,6 +26,7 @@ if [[ -f "$STATUS/status/FAILED" ]]; then
 fi
 trap 'code=$?; echo "FAILED array_index=$n job=$SLURM_JOB_ID rc=$code" > "$STATUS/status/FAILED"; exit "$code"' ERR
 test -f data/local/hpc_pipeline/smoke_PASS
+test -f data/local/hpc_pipeline/reload_PASS
 test -f data/local/dual_axis_plan/experiment_plan.json
 arms=(pointwise caid caid_s2pref dual_axis)
 seeds=(17 23 42)
