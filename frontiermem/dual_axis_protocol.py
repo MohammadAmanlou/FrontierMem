@@ -99,8 +99,9 @@ def load_and_verify(manifest_path: Path, rpeval_path: Path, s2pref_dir: Path):
 
 
 def format_side(side: dict) -> str:
-    """One identical input template for RPEval/S2Pref and every training arm."""
-    segments = ["[PREFERENCE]\n" + str(side.get("preference", ""))]
+    """Query-first shared template for every arm; protect queries from truncation."""
+    segments = ["[QUERY]\n" + str(side.get("query", "")),
+                "[PREFERENCE]\n" + str(side.get("preference", ""))]
     history = str(side.get("history") or "").strip()
     context = str(side.get("context") or "").strip()
     if history:
@@ -108,7 +109,6 @@ def format_side(side: dict) -> str:
     if context:
         segments.append("[CONTEXT]\n" + context)
     segments.extend((
-        "[QUERY]\n" + str(side.get("query", "")),
         "[TASK]\nClassify how the preference should affect this request: "
         "IGNORE, SUPPORT, or DOMINATE. The binary applicability event is "
         "SUPPORT or DOMINATE versus IGNORE.",
