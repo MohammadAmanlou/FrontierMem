@@ -256,7 +256,10 @@ def train(args, data, info):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if (args.output_dir / "training_summary.json").exists():
         raise RuntimeError("This run directory already has a completed result; specify a new --output-dir")
-    # Qwen3.5/3.8 multimodal configs may require a text-specific classification\n    # implementation and recent Transformers/PEFT; fail closed on GPU smoke\n    # rather than interpreting a dry-run as proven model compatibility.\n    torch, model, tokenizer = setup_torch_model(args)
+    # Qwen3.5/3.8 multimodal configs may require a text-specific classification
+    # implementation and recent Transformers/PEFT; fail closed on GPU smoke
+    # rather than interpreting a dry-run as proven model compatibility.
+    torch, model, tokenizer = setup_torch_model(args)
     import torch.nn.functional as F
 
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
