@@ -81,6 +81,7 @@ def parse_args(argv=None):
                    default=Path("data/local/s2pref_candidates"))
     p.add_argument("--output-dir", type=Path, default=None)
     p.add_argument("--model", default="Qwen/Qwen3.5-9B")
+    p.add_argument("--revision", default=None, help="Pinned Hugging Face checkpoint commit")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--allow-silver-exploratory", action="store_true",
                    help="Permit experimental silver training; NOT a gold-label approval")
@@ -139,6 +140,26 @@ def rank_loss(pos, neg, torch, margin):
     return F.softplus(margin - (pos - neg)).mean()
 
 
+def ensure_classification_backend(model_id):
+    """Use a native sequence classifier when available, otherwise register
+    the standard Transformers last-token classifier for dense Granite.
+    No remote custom Python code is executed.
+    """
+    from transformers import AutoModelForSequenceClassification
+    if model_id.startswith("ibm-granite/granite-4.2-"):
+        from transformers import GraniteConfig
+        if GraniteConfig not in AutoModelForSequenceClassification._model_mapping:
+            from transformers.modeling_layers import GenericForSequenceClassification
+            from transformers.models.granite.modeling_granite import GranitePreTrainedModel
+
+            class GraniteForSequenceClassification(GenericForSequenceClassification, GranitePreTrainedModel):
+                pass
+
+            AutoModelForSequenceClassification.register(
+                GraniteConfig, GraniteForSequenceClassification
+            )
+
+
 def setup_torch_model(args):
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, BitsAndBytesConfig
@@ -147,7 +168,8 @@ def setup_torch_model(args):
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA missing from Slurm allocation")
     dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    ensure_classification_backend(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
@@ -159,6 +181,7 @@ def setup_torch_model(args):
     )
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model,
+        revision=args.revision,
         num_labels=3,
         id2label={v: k for k, v in LABEL2ID.items()},
         label2id=LABEL2ID,
@@ -168,7 +191,9 @@ def setup_torch_model(args):
         attn_implementation="sdpa",
     )
     model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.get_text_config().pad_token_id = tokenizer.pad_token_id
     model.config.use_cache = False
+    model.config.get_text_config().use_cache = False
     model = prepare_model_for_kbit_training(
         model, use_gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
@@ -181,6 +206,8 @@ def setup_torch_model(args):
         bias="none", use_rslora=True,
     )
     model = get_peft_model(model, lora)
+    if not any("score" in name and p.requires_grad for name, p in model.named_parameters()):
+        raise RuntimeError("Classification head is not trainable")
     model.print_trainable_parameters()
     return torch, model, tokenizer
 
@@ -376,7 +403,7 @@ def train(args, data, info):
     manifest = {
         **info,
         "status": "GPU_TRAINING_COMPLETED_EXPLORATORY",
-        "seed": args.seed, "model": args.model,
+        "seed": args.seed, "model": args.model, "model_revision": args.revision,
         "slurm_job_id": os.getenv("SLURM_JOB_ID"),
         "slurm_node": os.getenv("SLURMD_NODENAME"),
         "cuda_name": torch.cuda.get_device_name(0),
