@@ -42,6 +42,7 @@ def main():
             "--rpeval-pairs",str(src/"data/external_processed/caid_pairwise_train.jsonl"),
             "--s2pref-dir",str(src/"data/local/s2pref_candidates"),"--allow-silver-exploratory",
             "--epochs","1","--pairs-per-batch","2","--grad-accum","4",
+            "--lambda-silver-binary","0.25","--lambda-context-rank","0.25",
             "--max-train-steps","0","--max-eval-pairs","0","--max-length","768","--save-adapter",
             "--output-dir",str(out)])
     summary=json.loads((out/"training_summary.json").read_text())
