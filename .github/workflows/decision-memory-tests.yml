@@ -4,6 +4,7 @@ on:
     branches:
       - 'research/decision-sufficient-memory-2026-11'
       - 'research/multibackbone-2026-11'
+      - 'research/smallbackbone-baselines-2026-11'
   pull_request:
     paths:
       - 'frontiermem/decision_memory.py'
@@ -46,15 +47,15 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install minimal CPU dependencies
-        run: python -m pip install pytest 'pandas>=2.0'
+        run: python -m pip install pytest 'pandas>=2.0' scipy scikit-learn
       - name: Run standalone decision-memory tests
-        run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py tests/test_hpc_data_preflight.py tests/test_s2pref_candidate_audit.py tests/test_prepare_dual_axis_run.py tests/test_dual_axis_qwen_protocol.py tests/test_backbone_selection.py tests/test_weekly_pipeline.py
+        run: python -m pytest -q tests/test_decision_memory.py tests/test_s2pref_pair_export.py tests/test_hpc_data_preflight.py tests/test_s2pref_candidate_audit.py tests/test_prepare_dual_axis_run.py tests/test_dual_axis_qwen_protocol.py tests/test_backbone_selection.py tests/test_weekly_pipeline.py tests/test_lexical_baseline_objective.py
       - name: Syntax-check unattended HPC batch scripts
         run: |
           for f in scripts/hpc_*.sbatch scripts/hpc_*.sh; do
             bash -n "$f" || exit 1
           done
       - name: Compile weekly Python modules
-        run: python -m compileall -q scripts/train_dual_axis_qwen.py scripts/eval_weekly_heldout.py scripts/aggregate_weekly_results.py
+        run: python -m compileall -q scripts/train_dual_axis_qwen.py scripts/eval_weekly_heldout.py scripts/aggregate_weekly_results.py scripts/train_modernbert_full.py scripts/train_lexical_baselines.py
       - name: Run non-scientific plumbing demonstration
         run: python scripts/demo_decision_memory.py | grep 'DEMO_ONLY_NOT_RESEARCH_EVIDENCE'
