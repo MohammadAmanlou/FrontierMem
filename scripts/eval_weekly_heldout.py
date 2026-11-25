@@ -132,19 +132,24 @@ def measure_part(rows, predictions, source, section):
     return out
 
 
-def load_adapter(base, adapter, tokenizer):
+def load_adapter(base, adapter, tokenizer, revision=None):
     import torch
     from transformers import AutoModelForSequenceClassification, BitsAndBytesConfig
     from peft import PeftModel
+    from scripts.train_dual_axis_qwen import ensure_classification_backend
+    ensure_classification_backend(base)
     quant = BitsAndBytesConfig(
         load_in_4bit=True, bnb_4bit_quant_type="nf4",
         bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16,
     )
     model = AutoModelForSequenceClassification.from_pretrained(
-        base, num_labels=3, quantization_config=quant, device_map={"":0},
+        base, revision=revision, num_labels=3, quantization_config=quant, device_map={"":0},
         dtype=torch.bfloat16, attn_implementation="sdpa",
     )
     model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.get_text_config().pad_token_id = tokenizer.pad_token_id
+    model.config.use_cache = False
+    model.config.get_text_config().use_cache = False
     model = PeftModel.from_pretrained(model, str(adapter), is_trainable=False)
     model.eval()
     return model
@@ -207,11 +212,22 @@ def run(args):
         root=args.runs_root / f"seed_{seed}" / arm
         if (root/"training_summary.json").is_file() and (root/"best_adapter"/"adapter_config.json").is_file():
             available.append((arm,seed,root))
+    if args.arm is not None:
+        available = [v for v in available if v[0] == args.arm and v[1] == args.seed]
+        if len(available) != 1:
+            raise RuntimeError("Requested completed run not found")
     if args.require_all and len(available) != len(expected):
         raise RuntimeError(f"Only {len(available)}/{len(expected)} completed; refusing final held-out evaluation")
     for arm,seed,root in available:
         summary=json.loads((root/"training_summary.json").read_text())
-        if summary.get("model")!="Qwen/Qwen3.5-9B" or summary.get("seed")!=seed or summary.get("arm")!=arm:
+        base = summary.get("model")
+        revision = summary.get("model_revision")
+        if not base or (args.model is not None and base != args.model) or summary.get("seed")!=seed or summary.get("arm")!=arm:
+            raise ValueError(f"Run metadata mismatch: {root}")
+        if args.revision is not None and revision != args.revision:
+            raise ValueError(f"Revision mismatch: {root}")
+        adapter_meta = json.loads((root/"best_adapter"/"adapter_config.json").read_text())
+        if adapter_meta.get("base_model_name_or_path") != base:
             raise ValueError(f"Run metadata mismatch: {root}")
         if any(h.get("partial_training") or h.get("partial_evaluation") for h in summary.get("history",[])):
             raise ValueError(f"Partial training/evaluation is not the full experiment: {root}")
@@ -220,13 +236,13 @@ def run(args):
             print(f"Skip completed eval {arm} seed {seed}",flush=True)
             continue
         out.mkdir(parents=True,exist_ok=True)
-        tok=AutoTokenizer.from_pretrained("Qwen/Qwen3.5-9B")
+        tok=AutoTokenizer.from_pretrained(str(root/"best_adapter"))
         if tok.pad_token is None:
             tok.pad_token=tok.eos_token
         tok.padding_side="right"
-        model=load_adapter("Qwen/Qwen3.5-9B",root/"best_adapter",tok)
+        model=load_adapter(base,root/"best_adapter",tok,revision)
         parts=evaluate_one(model,tok,groups,args.batch_size,args.max_length)
-        metrics={"arm":arm,"seed":seed,"model":"Qwen/Qwen3.5-9B",
+        metrics={"arm":arm,"seed":seed,"model":base,"model_revision":revision,
                  "evaluation_status":"HELD_OUT_DECISION_LEVEL_UNCALIBRATED",
                  "official_test_was_used_for_training_or_selection":False,
                  "note":"Published benchmark test examples were previously examined in the broader project; not a fresh blind confirmation.",
@@ -250,7 +266,13 @@ def main():
     p.add_argument("--batch-size",type=int,default=2)
     p.add_argument("--max-length",type=int,default=768)
     p.add_argument("--require-all",action="store_true")
+    p.add_argument("--arm",choices=ARMS)
+    p.add_argument("--seed",type=int,choices=SEEDS)
+    p.add_argument("--model")
+    p.add_argument("--revision")
     args=p.parse_args()
+    if (args.arm is None) != (args.seed is None) or (args.require_all and args.arm is not None):
+        p.error("--arm and --seed must be used together, not with --require-all")
     if args.batch_size<1 or args.max_length<128:
         p.error("batch-size must be positive; max-length >=128")
     run(args)
