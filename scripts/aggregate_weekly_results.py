@@ -23,7 +23,7 @@ def collect(root):
     for seed in SEEDS:
         for arm in ARMS:
             run = root / f"seed_{seed}" / arm
-            item = {"seed":seed,"arm":arm,"train_status":"missing",
+            item = {"seed":seed,"arm":arm,"model":None,"model_revision":None,"train_status":"missing",
                     "rpeval_dev_binary_macro_f1":None,
                     "rpeval_dev_native_macro_f1":None,
                     "rpeval_dev_pair_direction_accuracy":None,
@@ -44,6 +44,7 @@ def collect(root):
                 sv=chosen.get("s2pref_silver_dev",{})
                 item.update(
                     train_status="completed",
+                    model=r.get("model"), model_revision=r.get("model_revision"),
                     rpeval_dev_binary_macro_f1=rv.get("binary_macro_f1"),
                     rpeval_dev_native_macro_f1=rv.get("native_macro_f1"),
                     rpeval_dev_pair_direction_accuracy=rv.get("pair_direction_accuracy"),
@@ -56,7 +57,7 @@ def collect(root):
             held=run/"official_eval"/"metrics.json"
             if held.is_file():
                 e=json.loads(held.read_text(encoding="utf8"))
-                if e.get("arm")!=arm or e.get("seed")!=seed:
+                if e.get("arm")!=arm or e.get("seed")!=seed or e.get("model")!=item["model"] or e.get("model_revision")!=item["model_revision"]:
                     raise ValueError(f"Official eval mismatch {held}")
                 item["official_eval_status"]="completed"
                 for source,section in (
@@ -85,7 +86,7 @@ def render_markdown(rows):
         "# FrontierMem — Weekly experimental results (generated)",
         "",
         "This is an automatically generated status report, **not** a complete research paper.",
-        "Training: Qwen3.5-9B, one full RPEval epoch, 4 methods × 3 seeds.",
+        "Training: one full RPEval epoch, 4 methods × 3 seeds per model. Model: " + ", ".join(sorted({r["model"] for r in rows if r.get("model")})) + ".",
         "S2Pref candidate training labels are **derived silver, not human-adjudicated gold**.",
         "Native RPEval test sets and BenchPreS are evaluation-only; BenchPreS metrics are decision-level proxies.",
         "The official benchmark sets were examined in earlier research, so they are not fresh blind confirmation.",
